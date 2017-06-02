@@ -2,12 +2,19 @@
 
 #include "Utils.h"
 
+#include "btBulletDynamicsCommon.h"
+#include "BulletSoftBody\btSoftRigidDynamicsWorld.h"
+#include "BulletSoftBody\btDefaultSoftBodySolver.h"
+#include "BulletSoftBody\btSoftBodyHelpers.h"
+#include "BulletSoftBody\btSoftBodyRigidBodyCollisionConfiguration.h"
+
 class Camera;
 
 class Cloth
 {
 public:
 	Cloth();
+	Cloth(btSoftRigidDynamicsWorld* _world);
 	Cloth(std::vector<Position> _vecPosition, Camera* _camera);
 	~Cloth();
 
@@ -31,6 +38,9 @@ public:
 	//btSoftRigidDynamicsWorld*	getSoftDynamicsWorld();
 	//void createSoftBody(const btScalar size, const int num_x, const int num_z, const int fixed = 1 + 2);
 
+	btSoftBody* CreateCloth();
+	void renderSoftbody(btSoftBody* b);
+
 private:
 
 	Camera* camera;
@@ -51,5 +61,6 @@ private:
 
 	glm::vec3 direction;
 
-//	btSoftBodyWorldInfo softBodyWorldInfo;
+	//	btSoftBodyWorldInfo softBodyWorldInfo;
+	btSoftRigidDynamicsWorld* world;
 };

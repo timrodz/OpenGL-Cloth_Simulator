@@ -10,29 +10,21 @@
 // Mail			: charmaine.lim@mediadesign.school.nz
 //
 
-
-//#include "glew/glew.h"
-//#include "freeglut/freeglut.h"
-//#include "soil/SOIL.h"
-
-//#include "glm/glm.hpp"
-//#include "glm/gtc/matrix_transform.hpp"
-//#include "glm/gtc/type_ptr.hpp"
-
-//#include "fmod/fmod.hpp"
-
 #include "btBulletDynamicsCommon.h"
 #include "BulletSoftBody\btSoftRigidDynamicsWorld.h"
 #include "BulletSoftBody\btDefaultSoftBodySolver.h"
 #include "BulletSoftBody\btSoftBodyHelpers.h"
 #include "BulletSoftBody\btSoftBodyRigidBodyCollisionConfiguration.h"
 
+
 #include <iostream>
 
-#include "ShaderLoader.h"
+//#include "ShaderLoader.h"
 #include "Camera.h"
 #include "Light.h"
 #include "Cloth.h"
+#include "Plane.h"
+#include "Sphere.h"
 
 
 float currentTime;
@@ -43,7 +35,6 @@ unsigned char keyState[255];
 
 #define BUTTON_UP		0
 #define BUTTON_DOWN		1
-
 
 #define MOUSE_LEFT 0
 #define MOUSE_MIDDLE 1
@@ -65,11 +56,6 @@ int mouseY;
 Camera* camera;
 
 Light* light;
-//Light* triangle;
-//GameModel* ground;
-//GameModel* cube;
-//GameModel* sphere;
-//GameModel* quad;
 
 GLuint flatShaderProgram;
 
@@ -82,170 +68,85 @@ btConstraintSolver* solver; //calculates everything
 btSoftBodySolver* softbodySolver;
 std::vector<btRigidBody*> bodies;
 
-void renderPlane(btRigidBody* plane)
+btSoftBodyWorldInfo softBodyWorldInfo;
+CPlane* ground;
+CSphere* ball;
+Cloth* cloth;
+
+void createEmptyDynamicsWorld()
 {
-	if (plane->getCollisionShape()->getShapeType() != STATIC_PLANE_PROXYTYPE)
-	{
-		return;
-	}
-	glColor3f(0.8, 0.8, 0.8);
+	collisionConfig = new btSoftBodyRigidBodyCollisionConfiguration();
+	dispatcher = new	btCollisionDispatcher(collisionConfig);
 
-	btTransform t;
-	plane->getMotionState()->getWorldTransform(t);
-	float mat[16];
-	t.getOpenGLMatrix(mat);
-	glPushMatrix();
-	glMultMatrixf(mat); //translation, rotation
-	glBegin(GL_QUADS);
-	glVertex3f(-1000, 0, 1000);
-	glVertex3f(-1000, 0, -1000);
-	glVertex3f(1000, 0, -1000);
-	glVertex3f(1000, 0, -000);
-	glEnd();
-	glPopMatrix();
+	broadface = new btDbvtBroadphase(); //divides the space into different quads to only check for collisions within each quad
 
+	solver = new btSequentialImpulseConstraintSolver;
+
+	softbodySolver = new btDefaultSoftBodySolver();
+
+	//world = new btSoftRigidDynamicsWorld(dispatcher, broadface, solver, collisionConfig);
+	world = new btSoftRigidDynamicsWorld(dispatcher, broadface, solver, collisionConfig, softbodySolver);
+
+	world->setGravity(btVector3(0, -10, 0));
+
+	softBodyWorldInfo.m_broadphase = broadface;
+	softBodyWorldInfo.m_dispatcher = dispatcher;
+	softBodyWorldInfo.m_gravity = world->getGravity();
+	softBodyWorldInfo.m_sparsesdf.Initialize();
 }
 
-btRigidBody* AddSphere(float rad, float x, float y, float z, float mass)
+void initPhysics()
 {
-	btTransform t;
-	t.setIdentity();
-	t.setOrigin(btVector3(x, y, z));
-	btSphereShape* sphere = new btSphereShape(rad); //creates the shape
-	btVector3 inertia(0, 0, 0);
-	if (mass != 0)
-	{
-		sphere->calculateLocalInertia(mass, inertia);
-	}
-	btMotionState* motion = new btDefaultMotionState(t);
-	btRigidBody::btRigidBodyConstructionInfo info(mass, motion, sphere, inertia);
-	btRigidBody* body = new btRigidBody(info);
-	world->addRigidBody(body);
-	bodies.push_back(body);
+	createEmptyDynamicsWorld();
 
-	return body;
+	ground = new CPlane(world);
+	btRigidBody* groundBody = ground->CreatePlane();
+	bodies.push_back(groundBody);
+
+	ball = new CSphere(world, quad);
+	btRigidBody* sphereBody = ball->CreateSphere(0.75, 0, 2, 0, 1.0);
+	bodies.push_back(sphereBody);
+
+	cloth = new Cloth(world);
+	btSoftBody* clothBody = cloth->CreateCloth();
 }
-
-void renderSphere(btRigidBody* sphere)
-{
-	if (sphere->getCollisionShape()->getShapeType() != SPHERE_SHAPE_PROXYTYPE)
-	{
-		return;
-	}
-	glColor3f(0, 0, 1);
-
-	float r = ((btSphereShape*)sphere->getCollisionShape())->getRadius();
-	btTransform t;
-	sphere->getMotionState()->getWorldTransform(t);
-	float mat[16];
-	t.getOpenGLMatrix(mat);
-	glPushMatrix();
-	glMultMatrixf(mat); //translation, rotation
-	gluSphere(quad, r, 20, 20);
-	//glutSolidSphere(10 - 0.1, 50, 50);
-	glPopMatrix();
-
-	//btVector3 position = t.getOrigin();
-	//light->setPosition(glm::vec3(position.getX(), position.getY(), position.getZ()));
-	//light->setRadius();
-}
-void renderSoftbody(btSoftBody* b)
-{
-	//btSoftBodyHelpers::Draw(b, world->getDebugDrawer(), world->getDrawFlags());
-
-	glColor3f(0.0f, 1.0f, 0.0f);
-	glBegin(GL_TRIANGLES);
-	for (int i = 0; i < b->m_faces.size(); i++)
-	{
-		std::vector<Position> vecPosition;
-		for (int j = 0; j < 3; j++)
-		{
-			//glNormal3f(b->m_faces[i].m_normal[j],
-			//	b->m_faces[i].m_normal[j],
-			//	b->m_faces[i].m_normal[j]);
-
-			//glNormal3fv(&b->m_faces[i].m_normal[j]);
-
-			glVertex3f(b->m_faces[i].m_n[j]->m_x.x(),
-				b->m_faces[i].m_n[j]->m_x.y(),
-				b->m_faces[i].m_n[j]->m_x.z());
-
-			Position pos = Position(b->m_faces[i].m_n[j]->m_x.x(), b->m_faces[i].m_n[j]->m_x.y(), b->m_faces[i].m_n[j]->m_x.z());
-			vecPosition.push_back(pos);
-		}
-
-		//GLuint vao;
-		//glGenVertexArrays(1, &vao);
-		//glBindVertexArray(vao);
-
-		//Cloth* triangles = new Cloth(vecPosition, camera);
-		//triangles->setProgram(flatShaderProgram);
-		//triangles->setColor(glm::vec3(0.0f, 1.0f, 0.0f));
-		//triangles->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
-		//triangles->update(deltaTime);
-		//triangles->render();
-	}
-	glEnd();
-	/*glColor3f(0.0f, 0.0f, 1.0f);
-	glBegin(GL_LINES);
-	for (int i = 0; i < b->m_links.size(); i++)
-	{
-	for (int j = 0; j < 2; j++)
-	{
-	glVertex3f(b->m_links[i].m_n[j]->m_x.x(),
-	b->m_links[i].m_n[j]->m_x.y(),
-	b->m_links[i].m_n[j]->m_x.z());
-	}
-	}
-	glEnd();*/
-}
-
 
 void init()
 {
 	quad = gluNewQuadric();
 
-	collisionConfig = new btSoftBodyRigidBodyCollisionConfiguration();
-	dispatcher = new btCollisionDispatcher(collisionConfig);
-	broadface = new btDbvtBroadphase(); //divides the space into different quads to only check for collisions within each quad
-	solver = new btSequentialImpulseConstraintSolver();
-	softbodySolver = new btDefaultSoftBodySolver();
-	world = new btSoftRigidDynamicsWorld(dispatcher, broadface, solver, collisionConfig, softbodySolver);
-	world->setGravity( btVector3(0, -10, 0) );
+	//collisionConfig = new btSoftBodyRigidBodyCollisionConfiguration();
+	//dispatcher = new btCollisionDispatcher(collisionConfig);
+	//broadface = new btDbvtBroadphase(); //divides the space into different quads to only check for collisions within each quad
+	//solver = new btSequentialImpulseConstraintSolver();
+	//softbodySolver = new btDefaultSoftBodySolver();
+	//world = new btSoftRigidDynamicsWorld(dispatcher, broadface, solver, collisionConfig, softbodySolver);
+	//world->setGravity( btVector3(0, -10, 0) );
 
-	btTransform t;
-	t.setIdentity();
-	t.setOrigin(btVector3(0, 0, 0));
-	btStaticPlaneShape* plane = new btStaticPlaneShape(btVector3(0, 1, 0), 0); //creates the shape
-	btMotionState* motion = new btDefaultMotionState(t);
-	btRigidBody::btRigidBodyConstructionInfo info(0.0, motion, plane); //mass = 0 is static, 
-	btRigidBody* body = new btRigidBody(info);
-	world->addRigidBody(body);
-	bodies.push_back(body);
-	//bodies.push_back(new bulletObject(body, 4, 0.8, 0.8, 0.8));
-	//body->setUserPointer(bodies[bodies.size() - 1]);
+	initPhysics();
 
-	AddSphere(1.0, 0, -10, 0, 1.0);
-	float s = 1; //position and size
-	float h = 4; //height
-	btSoftBody* softBody = btSoftBodyHelpers::CreatePatch(
-			world->getWorldInfo(), btVector3(-s, h, -s), btVector3(s, h, -s),
-			btVector3(-s, h, s), btVector3(s, h, s), 50, 50, 4 + 8, true);
-	softBody->m_cfg.viterations = 10; //increase to 100 for ball not to go through
-	softBody->m_cfg.piterations = 10;
-	softBody->setTotalMass(3.0);
-	//softBody->setMass(100, 100); //make vertex 100 static
-	btVector3 wind =  softBody->getWindVelocity();
-	softBody->setWindVelocity(btVector3(0.0f, 100.0f, -100.0f));
-	softBody->applyForces();
-	world->addSoftBody(softBody);
+	//AddSphere(1.0, 0, -10, 0, 1.0);
+
+	//float s = 1; //position and size
+	//float h = 4; //height
+	//btSoftBody* softBody = btSoftBodyHelpers::CreatePatch(
+	//		world->getWorldInfo(), btVector3(-s, h, -s), btVector3(s, h, -s),
+	//		btVector3(-s, h, s), btVector3(s, h, s), 50, 50, 4 + 8, true);
+	//softBody->m_cfg.viterations = 10; //increase to 100 for ball not to go through
+	//softBody->m_cfg.piterations = 10;
+	//softBody->setTotalMass(3.0);
+	////softBody->setMass(100, 100); //make vertex 100 static
+	//btVector3 wind =  softBody->getWindVelocity();
+	//softBody->setWindVelocity(btVector3(0.0f, 100.0f, -100.0f));
+	//softBody->applyForces();
+	//world->addSoftBody(softBody);
 
 	glPolygonMode(GL_FRONT_AND_BACK, GL_FILL); // use GL_LINE for wireframe mode
-	//glEnable(GL_DEPTH_TEST); // enalbe the depth testing
-	//glDepthFunc(GL_LESS);
+											   //glEnable(GL_DEPTH_TEST); // enalbe the depth testing
+											   //glDepthFunc(GL_LESS);
 
 
-	//camera = new Camera(90.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 10000.0f);
+											   //camera = new Camera(90.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 10000.0f);
 	camera = new Camera(45.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 100.0f);
 	camera->setCameraSpeed(15.0f);
 	//camera->setPosition(glm::vec3(0, 0, 100));
@@ -283,6 +184,40 @@ void init()
 	glLightfv(GL_LIGHT1, GL_DIFFUSE, (GLfloat *)&lightDiffuse1);
 
 	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
+
+	//ShaderLoader shader;
+	//flatShaderProgram = shader.CreateProgram("Assets/Shaders/FlatModel.vs", "Assets/Shaders/FlatModel.fs");
+	//////GLuint litTexturedShaderProgram = shader.CreateProgram("Assets/Shaders/LitTexturedModel.vs", "Assets/Shaders/LitTexturedModel.fs");
+	////
+
+
+	//light = new Light(ModelType::kSphere, camera);
+	//light->setProgram(flatShaderProgram);
+	//light->setColor(glm::vec3(0.0f, 0.0f, 1.0f));
+	//light->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+	//light->setSpeed(10.0f);
+
+	//triangle = new Light(ModelType::kTriangle, camera);
+	////triangle = new GameModel(ModelType::kTriangle, camera, "Assets/Images/wall.jpg", light, 0.1f, 0.5f);
+	//triangle->setProgram(litTexturedShaderProgram);
+	//////triangle->setPosition(glm::vec3(2.0f, -2.0f, 0.0f));
+	//triangle->setColor(glm::vec3(0.0f, 0.0f, 1.0f));
+	////triangle->setScale(glm::vec3(3.0f, 3.0f, 3.0f));
+
+	//ground = new GameModel(ModelType::kQuad, camera, "Assets/images/container.jpg", light, 0.1f, 0.5f);
+	//ground->setProgram(litTexturedShaderProgram);
+	//ground->setColor(glm::vec3(1.0f, 1.0f, 1.0f));
+	////ground->setPosition(glm::vec3(2.0f, 2.0f, 0.0f));
+	//ground->setPosition(glm::vec3(-5.0f, 40.0f, -25.0f));
+	//ground->setScale(glm::vec3(2.0f, 2.0f, 1.0f));
+
+	//cube = new GameModel(ModelType::kCube, camera, "Assets/images/Rayman.jpg", light, 0.1f, 0.5f);
+	//cube->setProgram(litTexturedShaderProgram);
+	//cube->setColor(glm::vec3(1.0f, 1.0f, 1.0f));
+	////cube->setPosition(glm::vec3(-2.0f, 2.0f, 0.0f));
+	//cube->setPosition(glm::vec3(10.0f, 40.0f, -26.0f));
+	////cube->setRotation(0.0f);
+	//cube->setScale(glm::vec3(2.0f, 2.0f, 1.0f));
 }
 
 void updateControls()
@@ -308,18 +243,28 @@ void updateControls()
 		camera->ProcessKeyboard(DOWNWARD, deltaTime);
 	}
 
+
+	/*if (keyState[(unsigned char) 'z'] == BUTTON_DOWN) {
+	cube->rotate(glm::vec3(1.0f, 0.0f, 0.0f));
+	}if (keyState[(unsigned char) 'x'] == BUTTON_DOWN) {
+	cube->rotate(glm::vec3(-1.0f, 0.0f, 0.0f));
+	}if (keyState[(unsigned char) 'n'] == BUTTON_DOWN) {
+	cube->rotate(glm::vec3(0.0f, 0.0f, 1.0f));
+	}if (keyState[(unsigned char) 'm'] == BUTTON_DOWN) {
+	cube->rotate(glm::vec3(0.0f, 0.0f, -1.0f));
+	}*/
 	if (keyState[(unsigned char) 'z'] == BUTTON_DOWN)
 	{
-		btRigidBody* sphere = AddSphere(1.0, camera->getCameraPosition().x, camera->getCameraPosition().y, camera->getCameraPosition().z, 10.0);
-		glm::vec3 look = camera->getLook() * 40.0f;
-		sphere->setLinearVelocity(btVector3(look.x, look.y, look.z));
+		//btRigidBody* sphere = ball->CreateSphere(1.0, camera->getCameraPosition().x, camera->getCameraPosition().y, camera->getCameraPosition().z, 10.0);
+		//glm::vec3 look = camera->getLook() * 40.0f;
+		//sphere->setLinearVelocity(btVector3(look.x, look.y, look.z));
 	}
 }
 
 //
 void update()
 {
-	world->stepSimulation(1 / 60.0); 
+	world->stepSimulation(1 / 60.0);
 
 	GLfloat currentTime = glutGet(GLUT_ELAPSED_TIME); // get current time
 	currentTime = currentTime / 1000; // convert millisecond to seconds
@@ -330,8 +275,14 @@ void update()
 	updateControls();
 
 	camera->update();
-	
+	//light->update(dt);
+	/*triangle->update(dt);
+	ground->update(dt);
+	cube->update(dt);*/
+
 	prevTime = currentTime;
+
+	//	UpdateMousePicking();
 
 	glutPostRedisplay(); // the render function is called
 }
@@ -339,21 +290,38 @@ void update()
 void display()
 {
 	// Clear the screen with the blue color set in the init
-	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-	
+
 	glLoadIdentity;
 
+	//cam.Control();
+	//cam.UpdateCamera();
+
+	//light->render();
+	/*ground->render();
+	triangle->render();
+
+	cube->render();
+	sphere->render();*/
+
+	//glDisable(GL_CULL_FACE);
+
+	//glColor3f(1.0f, 1.0f, 0.0f);
+	//gluSphere(quad, 1.0, 30, 30);
+
+	//glTranslatef(0.0f, -0.01f, -0.1f);
 
 	for (int i = 0; i < bodies.size(); i++)
 	{
 		if (bodies[i]->getCollisionShape()->getShapeType() == STATIC_PLANE_PROXYTYPE)
 		{
-			//renderPlane(bodies[i]);
+			ground->renderPlane(bodies[i]);
+
 		}
 		if (bodies[i]->getCollisionShape()->getShapeType() == SPHERE_SHAPE_PROXYTYPE)
 		{
-			renderSphere(bodies[i]);
+			ball->renderSphere(bodies[i]);
 		}
 		//else if (bodies[i]->body->getCollisionShape()->getShapeType() == CYLINDER_SHAPE_PROXYTYPE)
 		//	renderCylinder(bodies[i]);
@@ -364,7 +332,7 @@ void display()
 	}
 	for (int i = 0; i < world->getSoftBodyArray().size(); i++)
 	{
-		renderSoftbody(world->getSoftBodyArray()[i]);
+		cloth->renderSoftbody(world->getSoftBodyArray()[i]);
 	}
 
 	glutSwapBuffers();
@@ -439,11 +407,57 @@ void reshape(int w, int h)
 	glLoadIdentity();
 }
 
+void FunctionKeyDown(int key, int x, int y)
+{
+	switch (key)
+	{
+	case GLUT_KEY_F1:
+		break;
+	case GLUT_KEY_F2:
+		break;
+	case GLUT_KEY_F3:
+		break;
+	case GLUT_KEY_F4:
+		break;
+	case GLUT_KEY_F5:
+		break;
+	case GLUT_KEY_F6:
+		break;
+	case GLUT_KEY_F7:
+		break;
+	case GLUT_KEY_F8:
+		break;
+	}
+}
+
+void FunctionKeyUp(int key, int x, int y)
+{
+	switch (key)
+	{
+	case GLUT_KEY_F1:
+		break;
+	case GLUT_KEY_F2:
+		break;
+	case GLUT_KEY_F3:
+		break;
+	case GLUT_KEY_F4:
+		break;
+	case GLUT_KEY_F5:
+		break;
+	case GLUT_KEY_F6:
+		break;
+	case GLUT_KEY_F7:
+		break;
+	case GLUT_KEY_F8:
+		break;
+	}
+}
+
 int main(int argc, char **argv)
 {
 	// Initialize a window
 	glutInit(&argc, argv);
-	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA );
+	glutInitDisplayMode(GLUT_DEPTH | GLUT_DOUBLE | GLUT_RGBA);
 	//glutInitDisplayMode(GLUT_RGB | GLUT_DOUBLE | GLUT_DEPTH);
 	glutInitWindowPosition(0, 0);
 	glutInitWindowSize(Utils::WIDTH, Utils::HEIGHT);
@@ -460,7 +474,10 @@ int main(int argc, char **argv)
 	glutDisplayFunc(display);
 	//glutReshapeFunc(reshape);
 	glutKeyboardFunc(keyboard);
-	
+
+	//glutSpecialFunc(FunctionKeyDown);
+	//glutSpecialUpFunc(FunctionKeyUp);
+
 
 	//glutIdleFunc(update);
 	//// register callbacks
@@ -489,12 +506,17 @@ int main(int argc, char **argv)
 		world->removeSoftBody(world->getSoftBodyArray()[i]);
 		delete (world->getSoftBodyArray()[i]);
 	}
+
+	delete cloth;
+	delete ball;
+	delete ground;
+
 	delete dispatcher;
 	delete collisionConfig;
 	delete solver;
 	delete broadface;
 	delete softbodySolver;
-	delete world;	
+	delete world;
 
 	gluDeleteQuadric(quad);
 

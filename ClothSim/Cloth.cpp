@@ -9,6 +9,12 @@ Cloth::Cloth()
 {
 }
 
+Cloth::Cloth(btSoftRigidDynamicsWorld* _world)
+	: world(_world)
+{
+
+}
+
 Cloth::~Cloth()
 {
 }
@@ -35,7 +41,26 @@ Cloth::Cloth(std::vector<Position> _vecPosition, Camera* _camera)
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
 
-	
+	//glGenBuffers(1, &vbo);
+	//glBindBuffer(GL_ARRAY_BUFFER, vbo);
+	//glBufferData(GL_ARRAY_BUFFER, sizeof(VertexFormat) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
+
+	//glGenBuffers(1, &ebo);
+	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * indices.size(), &indices[0], GL_STATIC_DRAW);
+
+	////Attributes
+	//glEnableVertexAttribArray(0); //position
+	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (GLvoid*)0);
+
+	//glEnableVertexAttribArray(1); //texcoord
+	//glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (void*)(offsetof(VertexFormat, VertexFormat::texCoord)));
+
+	//glEnableVertexAttribArray(2); //normals
+	//glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (void*)(offsetof(VertexFormat, VertexFormat::normal)));
+
+	//glBindBuffer(GL_ARRAY_BUFFER, 0);
+	//glBindVertexArray(0);
 }
 
 void Cloth::update(GLfloat _deltaTime)
@@ -106,4 +131,98 @@ void Cloth::setSpeed(GLfloat _speed)
 glm::vec3 Cloth::getDirection()
 {
 	return direction;
+}
+
+btSoftBody* Cloth::CreateCloth()
+{
+	const btScalar s = 4; //size of cloth patch
+	const int NUM_X = 31; //vertices on X axis
+	const int NUM_Z = 31; //vertices on Z axis
+
+	int fixed = 1 + 2;
+	btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
+		btVector3(-s / 2, s + 1, 0),
+		btVector3(+s / 2, s + 1, 0),
+		btVector3(-s / 2, s + 1, +s),
+		btVector3(+s / 2, s + 1, +s),
+		NUM_X, NUM_Z,
+		fixed, true);
+
+	//body->getCollisionShape()->setMargin(0.001f);
+	body->generateBendingConstraints(2, body->appendMaterial());
+	body->setTotalMass(10);
+	//body->m_cfg.citerations = 10;
+	//body->m_cfg.diterations = 10;
+	body->m_cfg.piterations = 5;
+	body->m_cfg.kDP = 0.005f;
+	world->addSoftBody(body);
+
+	//int fixed = 4 + 8;
+	//float s = 1; //position and size
+	//float h = 4; //height
+	//btSoftBody* body = btSoftBodyHelpers::CreatePatch(
+	//	world->getWorldInfo(), btVector3(-s, h, -s), btVector3(s, h, -s),
+	//	btVector3(-s, h, s), btVector3(s, h, s), 50, 50, fixed, true);
+	//body->m_cfg.viterations = 10; //increase to 100 for ball not to go through
+	//body->m_cfg.piterations = 10;
+	//body->setTotalMass(3.0);
+	////body->setMass(100, 100); //make vertex 100 static
+	////btVector3 wind = body->getWindVelocity();
+	////body->setWindVelocity(btVector3(0.0f, 100.0f, -100.0f));
+	////body->applyForces();
+	//world->addSoftBody(body);
+
+	return body;
+}
+
+
+void Cloth::renderSoftbody(btSoftBody* b)
+{
+	//btSoftBodyHelpers::Draw(b, world->getDebugDrawer(), world->getDrawFlags());
+
+	glColor3f(0.0f, 1.0f, 0.0f);
+	glBegin(GL_TRIANGLES);
+	for (int i = 0; i < b->m_faces.size(); i++)
+	{
+		std::vector<Position> vecPosition;
+		for (int j = 0; j < 3; j++)
+		{
+			//glNormal3f(b->m_faces[i].m_normal[j],
+			//	b->m_faces[i].m_normal[j],
+			//	b->m_faces[i].m_normal[j]);
+
+			glNormal3fv(&b->m_faces[i].m_normal[j]);
+
+			glVertex3f(b->m_faces[i].m_n[j]->m_x.x(),
+				b->m_faces[i].m_n[j]->m_x.y(),
+				b->m_faces[i].m_n[j]->m_x.z());
+
+			Position pos = Position(b->m_faces[i].m_n[j]->m_x.x(), b->m_faces[i].m_n[j]->m_x.y(), b->m_faces[i].m_n[j]->m_x.z());
+			vecPosition.push_back(pos);
+		}
+
+		//GLuint vao;
+		//glGenVertexArrays(1, &vao);
+		//glBindVertexArray(vao);
+
+		//Cloth* triangles = new Cloth(vecPosition, camera);
+		//triangles->setProgram(flatShaderProgram);
+		//triangles->setColor(glm::vec3(0.0f, 1.0f, 0.0f));
+		//triangles->setPosition(glm::vec3(0.0f, 0.0f, 0.0f));
+		//triangles->update(deltaTime);
+		//triangles->render();
+	}
+	glEnd();
+	/*glColor3f(0.0f, 0.0f, 1.0f);
+	glBegin(GL_LINES);
+	for (int i = 0; i < b->m_links.size(); i++)
+	{
+	for (int j = 0; j < 2; j++)
+	{
+	glVertex3f(b->m_links[i].m_n[j]->m_x.x(),
+	b->m_links[i].m_n[j]->m_x.y(),
+	b->m_links[i].m_n[j]->m_x.z());
+	}
+	}
+	glEnd();*/
 }
