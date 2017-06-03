@@ -19,7 +19,7 @@
 
 #include <iostream>
 
-//#include "ShaderLoader.h"
+#include "ShaderLoader.h"
 #include "Camera.h"
 #include "Light.h"
 #include "Cloth.h"
@@ -104,11 +104,42 @@ void initPhysics()
 	bodies.push_back(groundBody);
 
 	ball = new CSphere(world, quad);
-	btRigidBody* sphereBody = ball->CreateSphere(0.75, 0, 2, 0, 1.0);
-	bodies.push_back(sphereBody);
+	//btRigidBody* sphereBody = ball->CreateSphere(0.75, 0, 2, 0, 1.0);
+	//bodies.push_back(sphereBody);
 
 	cloth = new Cloth(world);
 	btSoftBody* clothBody = cloth->CreateCloth();
+
+	btRigidBody* body = ball->CreateSphere(0.10, -2, 5, 0, 0.0);
+	bodies.push_back(body);
+
+	btRigidBody* body1 = ball->CreateSphere(0.10, -1, 5, 0, 1000.0);
+	bodies.push_back(body1);
+	body1->setGravity(btVector3(0, 0, 0));
+	body1->setLinearVelocity(btVector3(-1.0f, 0, 0));
+
+	btRigidBody* body2 = ball->CreateSphere(0.10, 0, 5, 0, 1000.0);
+	bodies.push_back(body2);
+	body2->setGravity(btVector3(0, 0, 0));
+	body2->setLinearVelocity(btVector3(-1.0f, 0, 0));
+
+	btRigidBody* body3 = ball->CreateSphere(0.10, 1, 5, 0, 1000.0);
+	bodies.push_back(body3);
+	body3->setGravity(btVector3(0, 0, 0));
+	body3->setLinearVelocity(btVector3(-1.0f, 0, 0));
+
+	btRigidBody* body4 = ball->CreateSphere(0.10, 2, 5, 0, 1000.0);
+	bodies.push_back(body4);
+	body4->setGravity(btVector3(0, 0, 0));
+	body4->setLinearVelocity(btVector3(-1.0f, 0, 0));
+
+
+	clothBody->appendAnchor(0, body);
+	clothBody->appendAnchor(7, body1);
+	clothBody->appendAnchor(14, body2);
+	clothBody->appendAnchor(21, body3);
+	clothBody->appendAnchor(28, body4);
+
 }
 
 void init()
@@ -148,7 +179,7 @@ void init()
 
 											   //camera = new Camera(90.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 10000.0f);
 	camera = new Camera(45.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 100.0f);
-	camera->setCameraSpeed(15.0f);
+	camera->setCameraSpeed(1.0f);
 	//camera->setPosition(glm::vec3(0, 0, 100));
 
 	glTranslatef(0, -1, -5);
@@ -224,7 +255,7 @@ void updateControls()
 {
 	//camera controls
 	if (keyState[(unsigned char) 'w'] == BUTTON_DOWN) {
-		//camera->moveForward();
+		camera->moveForward();
 		camera->ProcessKeyboard(FORWARD, deltaTime);
 	}if (keyState[(unsigned char) 's'] == BUTTON_DOWN) {
 		//camera->moveBack();
@@ -274,7 +305,7 @@ void update()
 
 	updateControls();
 
-	camera->update();
+	//camera->update();
 	//light->update(dt);
 	/*triangle->update(dt);
 	ground->update(dt);
@@ -484,7 +515,7 @@ int main(int argc, char **argv)
 	//glutDisplayFunc(render);
 	//glutKeyboardFunc(keyboard);
 	glutKeyboardUpFunc(keyboard_up);
-	glutPassiveMotionFunc(mouseMove);
+	//glutPassiveMotionFunc(mouseMove);
 	glutMouseFunc(mouseScroll);
 
 	glutMainLoop();

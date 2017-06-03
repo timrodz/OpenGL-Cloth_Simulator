@@ -140,6 +140,7 @@ btSoftBody* Cloth::CreateCloth()
 	const int NUM_Z = 31; //vertices on Z axis
 
 	int fixed = 1 + 2;
+	fixed = 0;
 	btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
 		btVector3(-s / 2, s + 1, 0),
 		btVector3(+s / 2, s + 1, 0),
@@ -156,6 +157,8 @@ btSoftBody* Cloth::CreateCloth()
 	body->m_cfg.piterations = 5;
 	body->m_cfg.kDP = 0.005f;
 	world->addSoftBody(body);
+
+	//body->appendAnchor();
 
 	//int fixed = 4 + 8;
 	//float s = 1; //position and size
