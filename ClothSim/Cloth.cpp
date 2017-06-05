@@ -133,14 +133,14 @@ glm::vec3 Cloth::getDirection()
 	return direction;
 }
 
-btSoftBody* Cloth::CreateCloth()
+btSoftBody* Cloth::CreateCloth(int fixed)
 {
 	const btScalar s = 4; //size of cloth patch
 	const int NUM_X = 31; //vertices on X axis
 	const int NUM_Z = 31; //vertices on Z axis
 
-	int fixed = 1 + 2;
-	fixed = 0;
+	//fixed = 1 + 2;
+	//fixed = 0;
 	btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
 		btVector3(-s / 2, s + 1, 0),
 		btVector3(+s / 2, s + 1, 0),
@@ -150,7 +150,8 @@ btSoftBody* Cloth::CreateCloth()
 		fixed, true);
 
 	//body->getCollisionShape()->setMargin(0.001f);
-	body->generateBendingConstraints(2, body->appendMaterial());
+	//body->generateBendingConstraints(2, body->appendMaterial());
+	body->generateBendingConstraints(1, body->appendMaterial());
 	body->setTotalMass(10);
 	//body->m_cfg.citerations = 10;
 	//body->m_cfg.diterations = 10;

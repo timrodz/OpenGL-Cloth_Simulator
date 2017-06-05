@@ -25,6 +25,9 @@
 #include "Cloth.h"
 #include "Plane.h"
 #include "Sphere.h"
+#include "Cylinder.h"
+#include "Cube.h"
+#include "Cone.h"
 
 
 float currentTime;
@@ -72,6 +75,16 @@ btSoftBodyWorldInfo softBodyWorldInfo;
 CPlane* ground;
 CSphere* ball;
 Cloth* cloth;
+CCylinder* cylinder;
+CCone* cone;
+CCube* cube;
+
+//set node position directly
+/*
+btVector3   delta=targetPosition - softDemo->m_node->m_x;
+softDemo->m_node->m_x = targetPosition;
+softDemo->m_node->m_v+=delta/timeStep;
+*/
 
 void createEmptyDynamicsWorld()
 {
@@ -104,14 +117,29 @@ void initPhysics()
 	bodies.push_back(groundBody);
 
 	ball = new CSphere(world, quad);
-	//btRigidBody* sphereBody = ball->CreateSphere(0.75, 0, 2, 0, 1.0);
-	//bodies.push_back(sphereBody);
+	btRigidBody* sphereBody = ball->CreateSphere(0.5, -1, 1, 2, 0.0);
+	bodies.push_back(sphereBody);
+
+	cylinder = new CCylinder(world, quad);
+	btRigidBody* cylinderBody = cylinder->CreateCylinder(1, 1, 0, 1, 2, 0.0);
+	bodies.push_back(cylinderBody);
+
+	cone = new CCone (world, quad);
+	btRigidBody* coneBody = cone->CreateCone(1, 2, -2, 1, 2, 0.0);
+	bodies.push_back(coneBody);
+
+	cube = new CCube (world);
+	btRigidBody* cubeBody = cube->CreateCube(1, 1, 1, 1, 1, 2, 0.0);
+	bodies.push_back(cubeBody);
 
 	cloth = new Cloth(world);
-	btSoftBody* clothBody = cloth->CreateCloth();
+	btSoftBody* clothBody = cloth->CreateCloth(0);
+
+	Cloth* cloth2 = new Cloth(world);
+	btSoftBody* clothBody2 = cloth2->CreateCloth(0);
 
 	btRigidBody* body = ball->CreateSphere(0.10, -2, 5, 0, 0.0);
-	bodies.push_back(body);
+	//bodies.push_back(body);
 
 	btRigidBody* body1 = ball->CreateSphere(0.10, -1, 5, 0, 1000.0);
 	bodies.push_back(body1);
@@ -132,7 +160,6 @@ void initPhysics()
 	bodies.push_back(body4);
 	body4->setGravity(btVector3(0, 0, 0));
 	body4->setLinearVelocity(btVector3(-1.0f, 0, 0));
-
 
 	clothBody->appendAnchor(0, body);
 	clothBody->appendAnchor(7, body1);
@@ -182,7 +209,7 @@ void init()
 	camera->setCameraSpeed(1.0f);
 	//camera->setPosition(glm::vec3(0, 0, 100));
 
-	glTranslatef(0, -1, -5);
+	
 
 	//glClearColor(0.2f, 0.2f, 0.4f, 0.5f);
 	glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
@@ -251,6 +278,37 @@ void init()
 	//cube->setScale(glm::vec3(2.0f, 2.0f, 1.0f));
 }
 
+void reset()
+{
+	for (int i = 0; i < bodies.size(); i++)
+	{
+		world->removeCollisionObject(bodies[i]);
+		btMotionState* motionState = bodies[i]->getMotionState();
+		btCollisionShape* shape = bodies[i]->getCollisionShape();
+		delete bodies[i];
+		delete shape;
+		delete motionState;
+	}
+	bodies.clear();
+
+	//for (int i = 0; i < world->getSoftBodyArray().size(); i++)
+	//{
+	//	world->removeSoftBody(world->getSoftBodyArray()[i]);
+	//	//delete (world->getSoftBodyArray()[i]);
+	//}
+
+	//delete cloth;
+	//delete ball;
+	//delete ground;
+
+	//delete dispatcher;
+	//delete collisionConfig;
+	//delete solver;
+	//delete broadface;
+	//delete softbodySolver;
+	//delete world;
+}
+
 void updateControls()
 {
 	//camera controls
@@ -289,6 +347,13 @@ void updateControls()
 		//btRigidBody* sphere = ball->CreateSphere(1.0, camera->getCameraPosition().x, camera->getCameraPosition().y, camera->getCameraPosition().z, 10.0);
 		//glm::vec3 look = camera->getLook() * 40.0f;
 		//sphere->setLinearVelocity(btVector3(look.x, look.y, look.z));
+	}
+
+	if (keyState[(unsigned char) 'r'] == BUTTON_DOWN) 
+	{
+		reset();
+		init();
+		
 	}
 }
 
@@ -354,12 +419,19 @@ void display()
 		{
 			ball->renderSphere(bodies[i]);
 		}
-		//else if (bodies[i]->body->getCollisionShape()->getShapeType() == CYLINDER_SHAPE_PROXYTYPE)
-		//	renderCylinder(bodies[i]);
-		//else if (bodies[i]->body->getCollisionShape()->getShapeType() == CONE_SHAPE_PROXYTYPE)
-		//	renderCone(bodies[i]);
-		//else if (bodies[i]->body->getCollisionShape()->getShapeType() == BOX_SHAPE_PROXYTYPE)
-		//	renderBox(bodies[i]);
+		else if (bodies[i]->getCollisionShape()->getShapeType() == CYLINDER_SHAPE_PROXYTYPE)
+		{
+			cylinder->renderCylinder(bodies[i]);
+		}			
+		else if (bodies[i]->getCollisionShape()->getShapeType() == CONE_SHAPE_PROXYTYPE)
+		{
+			cone->renderCone(bodies[i]);
+		}		
+		else if (bodies[i]->getCollisionShape()->getShapeType() == BOX_SHAPE_PROXYTYPE)
+		{
+			cube->renderCube(bodies[i]);
+		}
+			
 	}
 	for (int i = 0; i < world->getSoftBodyArray().size(); i++)
 	{
@@ -484,6 +556,76 @@ void FunctionKeyUp(int key, int x, int y)
 	}
 }
 
+bool pickBody(const btVector3& rayFromWorld, const btVector3& rayToWorld)
+{
+	if (world == 0)
+		return false;
+
+	btCollisionWorld::ClosestRayResultCallback rayCallback(rayFromWorld, rayToWorld);
+	world->rayTest(rayFromWorld, rayToWorld, rayCallback);
+	if (rayCallback.hasHit()) {
+		btVector3 pickPos = rayCallback.m_hitPointWorld;
+		btRigidBody* body = (btRigidBody*)btRigidBody::upcast(rayCallback.m_collisionObject);
+		if (body) {
+			if (!(body->isStaticObject() || body->isKinematicObject())) {
+				/*btRigidBody* m_pickedBody = body;
+				m_savedState = m_pickedBody->getActivationState();
+				m_pickedBody->setActivationState(DISABLE_DEACTIVATION);
+
+				btVector3 localPivot = body->getCenterOfMassTransform().inverse() * pickPos;
+				btPoint2PointConstraint* p2p = new btPoint2PointConstraint(*body, localPivot);
+				world->addConstraint(p2p, true);
+				m_pickedConstraint = p2p;
+				btScalar mousePickClamping = 30.f;
+				p2p->m_setting.m_impulseClamp = mousePickClamping;
+				p2p->m_setting.m_tau = 0.001f;*/
+			}
+		}
+		/*m_oldPickingPos = rayToWorld;
+		m_hitPos = pickPos;
+		m_oldPickingDist = (pickPos - rayFromWorld).length();*/
+	}
+}
+
+void removePickingConstraint() {
+	/*if (m_pickedConstraint) {
+		m_pickedBody->forceActivationState(m_savedState);
+		m_pickedBody->activate();
+		m_dynamicsWorld->removeConstraint(m_pickedConstraint);
+		delete m_pickedConstraint;
+		m_pickedConstraint = 0;
+		m_pickedBody = 0;
+	}*/
+}
+
+void mouseButtonCallback(int button, int state, int x, int y)
+{
+	//CommonRenderInterface* renderer = m_guiHelper->getRenderInterface();
+	//CommonWindowInterface* window = m_guiHelper->getAppInterface()->m_window;
+
+	if (state == 1)
+	{
+		if (button == 0)
+		{
+			btVector3 camPos = btVector3(0, 1, 5);
+			//renderer->getActiveCamera()->getCameraPosition(camPos);
+
+			btVector3 rayFrom = camPos;
+
+			//btVector3 rayTo = getRayTo(int(x), int(y));
+			//pickBody(rayFrom, rayTo);
+		}
+		else
+		{
+			if (button == 0)
+			{
+				removePickingConstraint();
+				//remove p2p
+			}
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
 	// Initialize a window
@@ -500,10 +642,14 @@ int main(int argc, char **argv)
 	// Initialize the GL context with predefined values
 	init();
 
+	glTranslatef(0, -1, -5);
+
 	// Link the window to the rest of the code
 	glutIdleFunc(update);
 	glutDisplayFunc(display);
 	//glutReshapeFunc(reshape);
+
+	glutMouseFunc(mouseButtonCallback);
 	glutKeyboardFunc(keyboard);
 
 	//glutSpecialFunc(FunctionKeyDown);
@@ -515,6 +661,7 @@ int main(int argc, char **argv)
 	//glutDisplayFunc(render);
 	//glutKeyboardFunc(keyboard);
 	glutKeyboardUpFunc(keyboard_up);
+	
 	//glutPassiveMotionFunc(mouseMove);
 	glutMouseFunc(mouseScroll);
 

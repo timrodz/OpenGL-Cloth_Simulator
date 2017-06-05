@@ -4,7 +4,6 @@ CSphere::CSphere(btSoftRigidDynamicsWorld* _world, GLUquadricObj* _quad)
 	: world(_world)
 	, quad(_quad)
 {
-
 }
 
 CSphere::~CSphere()

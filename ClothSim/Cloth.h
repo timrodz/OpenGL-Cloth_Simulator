@@ -38,7 +38,7 @@ public:
 	//btSoftRigidDynamicsWorld*	getSoftDynamicsWorld();
 	//void createSoftBody(const btScalar size, const int num_x, const int num_z, const int fixed = 1 + 2);
 
-	btSoftBody* CreateCloth();
+	btSoftBody* CreateCloth(int fixed);
 	void renderSoftbody(btSoftBody* b);
 
 private:
