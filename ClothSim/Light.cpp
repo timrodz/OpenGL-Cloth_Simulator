@@ -82,13 +82,13 @@ void Light::render()
 	GLint modelLoc = glGetUniformLocation(program, "model");
 	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
 
-	GLint viewLoc = glGetUniformLocation(program, "view");
-	glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewMatrix()));
-	glm::mat4 xx = camera->getViewMatrix();
+	//GLint viewLoc = glGetUniformLocation(program, "view");
+	//glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewMatrix()));
+	//glm::mat4 xx = camera->getViewMatrix();
 
-	GLint projLoc = glGetUniformLocation(program, "projection");
-	glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(camera->getprojectionMatrix()));
-	glm::mat4 yy = camera->getprojectionMatrix();
+	//GLint projLoc = glGetUniformLocation(program, "projection");
+	//glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(camera->getprojectionMatrix()));
+	//glm::mat4 yy = camera->getprojectionMatrix();
 
 	glBindVertexArray(vao);
 	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);

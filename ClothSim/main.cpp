@@ -21,7 +21,7 @@
 
 #include "ShaderLoader.h"
 #include "Camera.h"
-#include "Light.h"
+//#include "Light.h"
 #include "Cloth.h"
 #include "Plane.h"
 #include "Sphere.h"
@@ -58,7 +58,7 @@ int mouseY;
 
 Camera* camera;
 
-Light* light;
+//Light* light;
 
 GLuint flatShaderProgram;
 
@@ -204,11 +204,11 @@ void init()
 											   //glDepthFunc(GL_LESS);
 
 
-											   //camera = new Camera(90.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 10000.0f);
-	camera = new Camera(45.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 100.0f);
-	camera->setCameraSpeed(1.0f);
+	//camera = new Camera(90.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 10000.0f);
+	//camera = new Camera(45.0f, Utils::WIDTH, Utils::HEIGHT, 0.1f, 100.0f);
+	//camera->setCameraSpeed(1.0f);
 	//camera->setPosition(glm::vec3(0, 0, 100));
-
+	camera = new Camera();
 	
 
 	//glClearColor(0.2f, 0.2f, 0.4f, 0.5f);
@@ -312,25 +312,25 @@ void reset()
 void updateControls()
 {
 	//camera controls
-	if (keyState[(unsigned char) 'w'] == BUTTON_DOWN) {
-		camera->moveForward();
-		camera->ProcessKeyboard(FORWARD, deltaTime);
-	}if (keyState[(unsigned char) 's'] == BUTTON_DOWN) {
-		//camera->moveBack();
-		camera->ProcessKeyboard(BACKWARD, deltaTime);
-	}if (keyState[(unsigned char) 'a'] == BUTTON_DOWN) {
-		//camera->moveLeft();
-		camera->ProcessKeyboard(LEFT, deltaTime);
-	}if (keyState[(unsigned char) 'd'] == BUTTON_DOWN) {
-		//camera->moveRight();
-		camera->ProcessKeyboard(RIGHT, deltaTime);
-	}if (keyState[(unsigned char) 'q'] == BUTTON_DOWN) {
-		//camera->moveUp();
-		camera->ProcessKeyboard(UPWARD, deltaTime);
-	}if (keyState[(unsigned char) 'e'] == BUTTON_DOWN) {
-		//camera->moveDown();
-		camera->ProcessKeyboard(DOWNWARD, deltaTime);
-	}
+	//if (keyState[(unsigned char) 'w'] == BUTTON_DOWN) {
+	//	camera->moveForward();
+	//	camera->ProcessKeyboard(FORWARD, deltaTime);
+	//}if (keyState[(unsigned char) 's'] == BUTTON_DOWN) {
+	//	//camera->moveBack();
+	//	camera->ProcessKeyboard(BACKWARD, deltaTime);
+	//}if (keyState[(unsigned char) 'a'] == BUTTON_DOWN) {
+	//	//camera->moveLeft();
+	//	camera->ProcessKeyboard(LEFT, deltaTime);
+	//}if (keyState[(unsigned char) 'd'] == BUTTON_DOWN) {
+	//	//camera->moveRight();
+	//	camera->ProcessKeyboard(RIGHT, deltaTime);
+	//}if (keyState[(unsigned char) 'q'] == BUTTON_DOWN) {
+	//	//camera->moveUp();
+	//	camera->ProcessKeyboard(UPWARD, deltaTime);
+	//}if (keyState[(unsigned char) 'e'] == BUTTON_DOWN) {
+	//	//camera->moveDown();
+	//	camera->ProcessKeyboard(DOWNWARD, deltaTime);
+	//}
 
 
 	/*if (keyState[(unsigned char) 'z'] == BUTTON_DOWN) {
@@ -391,8 +391,8 @@ void display()
 
 	glLoadIdentity;
 
-	//cam.Control();
-	//cam.UpdateCamera();
+	camera->Control(keyState);
+	camera->UpdateCamera();
 
 	//light->render();
 	/*ground->render();
@@ -468,7 +468,7 @@ void mouseMove(int xpos, int ypos)
 	mouseX = xpos;
 	mouseY = ypos;
 
-	camera->ProcessMouseMovement(xoffset, yoffset);
+	//camera->ProcessMouseMovement(xoffset, yoffset);
 }
 
 void mouseScroll(int button, int state, int x, int y)
@@ -491,7 +491,7 @@ void mouseScroll(int button, int state, int x, int y)
 			const double ZOOM_SENSITIVITY = -3.0;
 			//double fov = camera.getFOV() + dir * ZOOM_SENSITIVITY;
 
-			camera->ProcessMouseScroll(dir);
+			//camera->ProcessMouseScroll(dir);
 		}
 	}
 }
@@ -642,7 +642,8 @@ int main(int argc, char **argv)
 	// Initialize the GL context with predefined values
 	init();
 
-	glTranslatef(0, -1, -5);
+	//glTranslatef(0, -1, -5);
+	camera->setLocation(glm::vec3(0, 1, 5));	//the player will be top of the terrain
 
 	// Link the window to the rest of the code
 	glutIdleFunc(update);
