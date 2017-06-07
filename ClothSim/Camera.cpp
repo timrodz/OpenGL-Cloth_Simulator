@@ -190,6 +190,22 @@ bool Camera::isMoved()
 	return ismoved;
 }
 
+glm::vec3 Camera::getCameraUp()
+{
+	// Calculate the new Front vector
+	glm::vec3 look;
+	look.x = -cos(glm::radians(camPitch))*sin(glm::radians(camYaw));
+	look.y = sin(glm::radians(camPitch));
+	look.z = -cos(glm::radians(camPitch)*cos(glm::radians(camYaw)));
+	glm::vec3 Front = glm::normalize(look);
+	// Also re-calculate the Right and Up vector
+	glm::vec3 WorldUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	glm::vec3 Right = glm::normalize(glm::cross(Front, WorldUp));  // Normalize the vectors, because their length gets closer to 0 the more you look up or down which results in slower movement.
+	glm::vec3 Up = glm::normalize(glm::cross(Right, Front));
+
+	return Up;
+}
+
 
 //
 //

@@ -5,7 +5,7 @@
 #include "glm/gtc/type_ptr.hpp"
 
 Cloth::Cloth()
-	: speed(1.0f)
+	//: speed(1.0f)
 {
 }
 
@@ -19,128 +19,14 @@ Cloth::~Cloth()
 {
 }
 
-Cloth::Cloth(std::vector<Position> _vecPosition, Camera* _camera)
-{
-	camera = _camera;
-
-	scale = glm::vec3(1.0f, 1.0f, 1.0f);
-	position = glm::vec3(0.0, 0.0, 0.0);
-	color = glm::vec3(0.0f, 0.0f, 0.0f);
-	direction = glm::vec3(0.0f, -0.9f, -0.17f);
-
-	std::vector<VertexFormat> vertices;
-
-	vertices.push_back(VertexFormat(_vecPosition[0], TexCoord(1, 1), Normals(0.0f, 0.0f, 1.0)));
-	vertices.push_back(VertexFormat(_vecPosition[1], TexCoord(0, 1), Normals(0.0f, 0.0f, 1.0)));
-	vertices.push_back(VertexFormat(_vecPosition[2], TexCoord(1, 0), Normals(0.0f, 0.0f, 1.0)));
-
-	indices.push_back(0);
-	indices.push_back(1);
-	indices.push_back(2);
-
-	glGenVertexArrays(1, &vao);
-	glBindVertexArray(vao);
-
-	//glGenBuffers(1, &vbo);
-	//glBindBuffer(GL_ARRAY_BUFFER, vbo);
-	//glBufferData(GL_ARRAY_BUFFER, sizeof(VertexFormat) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
-
-	//glGenBuffers(1, &ebo);
-	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * indices.size(), &indices[0], GL_STATIC_DRAW);
-
-	////Attributes
-	//glEnableVertexAttribArray(0); //position
-	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (GLvoid*)0);
-
-	//glEnableVertexAttribArray(1); //texcoord
-	//glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (void*)(offsetof(VertexFormat, VertexFormat::texCoord)));
-
-	//glEnableVertexAttribArray(2); //normals
-	//glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (void*)(offsetof(VertexFormat, VertexFormat::normal)));
-
-	//glBindBuffer(GL_ARRAY_BUFFER, 0);
-	//glBindVertexArray(0);
-}
-
-void Cloth::update(GLfloat _deltaTime)
-{
-	deltaTime = _deltaTime;
-	model = glm::translate(glm::mat4(), position);
-	model = glm::scale(model, scale);
-}
-
-void Cloth::render()
-{
-	glUseProgram(program);
-
-	glUniform3f(glGetUniformLocation(program, "lightColor"), color.x, color.y, color.z);
-
-	GLint modelLoc = glGetUniformLocation(program, "model");
-	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
-
-	//GLint viewLoc = glGetUniformLocation(program, "view");
-	//glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewMatrix()));
-	//glm::mat4 view = camera->getViewMatrix();
-
-	//GLint projLoc = glGetUniformLocation(program, "projection");
-	//glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(camera->getprojectionMatrix()));
-	//glm::mat4 projection = camera->getprojectionMatrix();
-
-	glBindVertexArray(vao);
-	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
-	glBindVertexArray(0);
-}
-
-glm::vec3 Cloth::getColor()
-{
-	return color;
-}
-
-glm::vec3 Cloth::getPosition()
-{
-	return position;
-}
-
-void Cloth::setProgram(GLuint _program)
-{
-	program = _program;
-}
-
-
-void Cloth::setColor(glm::vec3 _color)
-{
-	color = _color;
-}
-
-void Cloth::setPosition(glm::vec3 _position)
-{
-	position = _position;
-}
-
-void Cloth::setScale(glm::vec3 _scale)
-{
-	scale = _scale;
-}
-
-void Cloth::setSpeed(GLfloat _speed)
-{
-	speed = _speed;
-}
-
-glm::vec3 Cloth::getDirection()
-{
-	return direction;
-}
-
 btSoftBody* Cloth::CreateCloth(int fixed)
 {
 	const btScalar s = 4; //size of cloth patch
 	const int NUM_X = 31; //vertices on X axis
 	const int NUM_Z = 31; //vertices on Z axis
 
-	//fixed = 1 + 2;
-	//fixed = 0;
+						  //fixed = 1 + 2;
+						  //fixed = 0;
 	btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
 		btVector3(-s / 2, s + 1, 0),
 		btVector3(+s / 2, s + 1, 0),
@@ -148,10 +34,8 @@ btSoftBody* Cloth::CreateCloth(int fixed)
 		btVector3(+s / 2, s + 1, +s),
 		NUM_X, NUM_Z,
 		fixed, true);
-
 	//body->getCollisionShape()->setMargin(0.001f);
-	//body->generateBendingConstraints(2, body->appendMaterial());
-	body->generateBendingConstraints(1, body->appendMaterial());
+	body->generateBendingConstraints(2, body->appendMaterial());
 	body->setTotalMass(10);
 	//body->m_cfg.citerations = 10;
 	//body->m_cfg.diterations = 10;
@@ -230,3 +114,117 @@ void Cloth::renderSoftbody(btSoftBody* b)
 	}
 	glEnd();*/
 }
+
+//Cloth::Cloth(std::vector<Position> _vecPosition, Camera* _camera)
+//{
+//	camera = _camera;
+//
+//	scale = glm::vec3(1.0f, 1.0f, 1.0f);
+//	position = glm::vec3(0.0, 0.0, 0.0);
+//	color = glm::vec3(0.0f, 0.0f, 0.0f);
+//	direction = glm::vec3(0.0f, -0.9f, -0.17f);
+//
+//	std::vector<VertexFormat> vertices;
+//
+//	vertices.push_back(VertexFormat(_vecPosition[0], TexCoord(1, 1), Normals(0.0f, 0.0f, 1.0)));
+//	vertices.push_back(VertexFormat(_vecPosition[1], TexCoord(0, 1), Normals(0.0f, 0.0f, 1.0)));
+//	vertices.push_back(VertexFormat(_vecPosition[2], TexCoord(1, 0), Normals(0.0f, 0.0f, 1.0)));
+//
+//	indices.push_back(0);
+//	indices.push_back(1);
+//	indices.push_back(2);
+//
+//	glGenVertexArrays(1, &vao);
+//	glBindVertexArray(vao);
+//
+//	//glGenBuffers(1, &vbo);
+//	//glBindBuffer(GL_ARRAY_BUFFER, vbo);
+//	//glBufferData(GL_ARRAY_BUFFER, sizeof(VertexFormat) * vertices.size(), &vertices[0], GL_STATIC_DRAW);
+//
+//	//glGenBuffers(1, &ebo);
+//	//glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+//	//glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(GLuint) * indices.size(), &indices[0], GL_STATIC_DRAW);
+//
+//	////Attributes
+//	//glEnableVertexAttribArray(0); //position
+//	//glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (GLvoid*)0);
+//
+//	//glEnableVertexAttribArray(1); //texcoord
+//	//glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (void*)(offsetof(VertexFormat, VertexFormat::texCoord)));
+//
+//	//glEnableVertexAttribArray(2); //normals
+//	//glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, sizeof(VertexFormat), (void*)(offsetof(VertexFormat, VertexFormat::normal)));
+//
+//	//glBindBuffer(GL_ARRAY_BUFFER, 0);
+//	//glBindVertexArray(0);
+//}
+
+//void Cloth::update(GLfloat _deltaTime)
+//{
+//	deltaTime = _deltaTime;
+//	model = glm::translate(glm::mat4(), position);
+//	model = glm::scale(model, scale);
+//}
+
+//void Cloth::render()
+//{
+//	glUseProgram(program);
+//
+//	glUniform3f(glGetUniformLocation(program, "lightColor"), color.x, color.y, color.z);
+//
+//	GLint modelLoc = glGetUniformLocation(program, "model");
+//	glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(model));
+//
+//	//GLint viewLoc = glGetUniformLocation(program, "view");
+//	//glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(camera->getViewMatrix()));
+//	//glm::mat4 view = camera->getViewMatrix();
+//
+//	//GLint projLoc = glGetUniformLocation(program, "projection");
+//	//glUniformMatrix4fv(projLoc, 1, GL_FALSE, glm::value_ptr(camera->getprojectionMatrix()));
+//	//glm::mat4 projection = camera->getprojectionMatrix();
+//
+//	glBindVertexArray(vao);
+//	glDrawElements(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0);
+//	glBindVertexArray(0);
+//}
+//
+//glm::vec3 Cloth::getColor()
+//{
+//	return color;
+//}
+//
+//glm::vec3 Cloth::getPosition()
+//{
+//	return position;
+//}
+//
+//void Cloth::setProgram(GLuint _program)
+//{
+//	program = _program;
+//}
+//
+//
+//void Cloth::setColor(glm::vec3 _color)
+//{
+//	color = _color;
+//}
+//
+//void Cloth::setPosition(glm::vec3 _position)
+//{
+//	position = _position;
+//}
+//
+//void Cloth::setScale(glm::vec3 _scale)
+//{
+//	scale = _scale;
+//}
+//
+//void Cloth::setSpeed(GLfloat _speed)
+//{
+//	speed = _speed;
+//}
+//
+//glm::vec3 Cloth::getDirection()
+//{
+//	return direction;
+//}

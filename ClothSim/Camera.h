@@ -120,6 +120,7 @@ public:
 	void Control(unsigned char state[255]);
 	void UpdateCamera();
 
+	glm::vec3 getCameraUp();
 	glm::vec3 getVector();
 	glm::vec3 getLocation();
 	float getPitch();
