@@ -79,6 +79,7 @@ CCube* cube;
 float gNear = 1.0f;
 float gFar = 1000.0f;
 
+//btSoftBody* m_pickedBody;
 btRigidBody* m_pickedBody;
 btTypedConstraint* m_pickedConstraint;
 int	m_savedState;
@@ -86,12 +87,23 @@ btVector3 m_oldPickingPos;
 btVector3 m_hitPos;
 btScalar m_oldPickingDist;
 
+btRigidBody* m_pPickedBody;				// the body we picked up
+btTypedConstraint* m_pPickConstraint;	// the constraint the body is attached to
+//btScalar m_oldPickingDist;// the distance from the camera to the hit point (so we can move the object up, down, left and right from our view)
+
+
 //set node position directly
 /*
 btVector3   delta=targetPosition - softDemo->m_node->m_x;
 softDemo->m_node->m_x = targetPosition;
 softDemo->m_node->m_v+=delta/timeStep;
 */
+
+struct RayResult
+{
+	btRigidBody* pBody;
+	btVector3 hitPoint;
+};
 
 void createEmptyDynamicsWorld()
 {
@@ -140,7 +152,7 @@ void initPhysics()
 	bodies.push_back(cubeBody);
 
 	cloth = new Cloth(world);
-	btSoftBody* clothBody = cloth->CreateCloth(0);
+	btSoftBody* clothBody = cloth->CreateCloth(1 + 2);
 
 	//Cloth* cloth2 = new Cloth(world);
 	//btSoftBody* clothBody2 = cloth2->CreateCloth(0);
@@ -168,11 +180,11 @@ void initPhysics()
 	body4->setGravity(btVector3(0, 0, 0));
 	body4->setLinearVelocity(btVector3(-1.0f, 0, 0));
 
-	clothBody->appendAnchor(0, body);
-	clothBody->appendAnchor(7, body1);
-	clothBody->appendAnchor(14, body2);
-	clothBody->appendAnchor(21, body3);
-	clothBody->appendAnchor(28, body4);
+	//clothBody->appendAnchor(0, body);
+	//clothBody->appendAnchor(7, body1);
+	//clothBody->appendAnchor(14, body2);
+	//clothBody->appendAnchor(21, body3);
+	//clothBody->appendAnchor(28, body4);
 
 	//btSliderConstraint(btRigidBody& rbA,
 	//	btRigidBody& rbB,
@@ -527,6 +539,8 @@ bool pickBody(const btVector3& rayFromWorld, const btVector3& rayToWorld)
 				btScalar mousePickClamping = 30.f;
 				p2p->m_setting.m_impulseClamp = mousePickClamping;
 				p2p->m_setting.m_tau = 0.001f;
+
+				//body->m_faces[rayCallback.in]
 			}
 		}
 		m_oldPickingPos = rayToWorld;
@@ -594,88 +608,186 @@ btVector3 getRayTo(int x, int y)
 	return rayTo;
 }
 
+bool Raycast(const btVector3 &startPosition, const btVector3 &direction, RayResult &output, bool includeStatic)
+{
+	if (!world)
+		return false;
+
+	glm::vec3 cameraLoc = camera->getLocation();
+
+	// get the picking ray from where we clicked
+	btVector3 rayTo = direction;
+	btVector3 rayFrom = btVector3(cameraLoc.x, cameraLoc.y, cameraLoc.z); // m_cameraPosition;
+
+	// create our raycast callback object
+	btCollisionWorld::ClosestRayResultCallback rayCallback(rayFrom, rayTo);
+
+	// perform the raycast
+	world->rayTest(rayFrom, rayTo, rayCallback);
+
+	// did we hit something?
+	if (rayCallback.hasHit())
+	{
+		// if so, get the rigid body we hit
+		btRigidBody* pBody = (btRigidBody*)btRigidBody::upcast(
+			rayCallback.m_collisionObject);
+		if (!pBody)
+			return false;
+
+		// prevent us from picking objects 
+		// like the ground plane
+		if (!includeStatic) // skip this check if we want it to hit static objects
+			if (pBody->isStaticObject() || pBody->isKinematicObject())
+				return false;
+
+		// set the result data
+		output.pBody = pBody;
+		output.hitPoint = rayCallback.m_hitPointWorld;
+		return true;
+	}
+
+	// we didn't hit anything
+	return false;
+}
+
+btVector3 GetPickingRay(int x, int y)
+{
+	// calculate the field-of-view
+	float tanFov = 1.0f / gNear;
+	float fov = btScalar(2.0) * btAtan(tanFov);
+
+	glm::vec3 cameraLoc = camera->getLocation();
+	glm::vec3 cameraFront = camera->getVector();
+	glm::vec3 cameraUp = camera->getCameraUp();
+	btVector3 cameraPosition = btVector3(cameraLoc.x, cameraLoc.y, cameraLoc.z);
+	btVector3 cameraTarget = btVector3(cameraFront.x, cameraFront.y, cameraFront.z);
+
+
+	// get a ray pointing forward from the 
+	// camera and extend it to the far plane
+	btVector3 rayFrom = cameraPosition;
+	btVector3 rayForward = (cameraTarget - cameraPosition);
+	rayForward.normalize();
+	rayForward *= gFar;
+
+	// find the horizontal and vertical vectors 
+	// relative to the current camera view
+	btVector3 ver = btVector3(cameraUp.x, cameraUp.y, cameraUp.z);
+	btVector3 hor = rayForward.cross(ver);
+	hor.normalize();
+	ver = hor.cross(rayForward);
+	ver.normalize();
+	hor *= 2.f * gFar * tanFov;
+	ver *= 2.f * gFar * tanFov;
+
+	// calculate the aspect ratio
+	btScalar aspect = Utils::WIDTH / (btScalar) Utils::HEIGHT;
+
+	// adjust the forward-ray based on
+	// the X/Y coordinates that were clicked
+	hor *= aspect;
+	btVector3 rayToCenter = rayFrom + rayForward;
+	btVector3 dHor = hor * 1.f / float(Utils::WIDTH);
+	btVector3 dVert = ver * 1.f / float(Utils::HEIGHT);
+	btVector3 rayTo = rayToCenter - 0.5f * hor + 0.5f * ver;
+	rayTo += btScalar(x) * dHor;
+	rayTo -= btScalar(y) * dVert;
+
+	// return the final result
+	return rayTo;
+}
+
 void CreatePickingConstraint(int x, int y)
 {
-	//if (!m_pWorld)
-	//	return;
+	if (!world)
+		return;
 
-	//// perform a raycast and return if it fails
-	//RayResult output;
-	//if (!Raycast(m_cameraPosition, GetPickingRay(x, y), output))
-	//	return;
+	glm::vec3 cameraLoc = camera->getLocation();
+	btVector3 cameraPosition = btVector3(cameraLoc.x, cameraLoc.y, cameraLoc.z);
 
-	//// store the body for future reference
-	//m_pPickedBody = output.pBody;
+	// perform a raycast and return if it fails
+	RayResult output;
+	if (!Raycast(cameraPosition, GetPickingRay(x, y), output, false))
+		return;
 
-	//// prevent the picked object from falling asleep
-	//m_pPickedBody->setActivationState(DISABLE_DEACTIVATION);
+	// store the body for future reference
+	m_pPickedBody = output.pBody;
 
-	//// get the hit position relative to the body we hit 
-	//btVector3 localPivot = m_pPickedBody->getCenterOfMassTransform().inverse()
-	//	* output.hitPoint;
+	// prevent the picked object from falling asleep
+	m_pPickedBody->setActivationState(DISABLE_DEACTIVATION);
 
-	//// create a transform for the pivot point
-	//btTransform pivot;
-	//pivot.setIdentity();
-	//pivot.setOrigin(localPivot);
+	// get the hit position relative to the body we hit 
+	btVector3 localPivot = m_pPickedBody->getCenterOfMassTransform().inverse()
+		* output.hitPoint;
 
-	//// create our constraint object
-	//btGeneric6DofConstraint* dof6 = new btGeneric6DofConstraint(*m_pPickedBody,
-	//	pivot, true);
-	//bool bLimitAngularMotion = true;
-	//if (bLimitAngularMotion)
-	//{
-	//	dof6->setAngularLowerLimit(btVector3(0, 0, 0));
-	//	dof6->setAngularUpperLimit(btVector3(0, 0, 0));
-	//}
+	// create a transform for the pivot point
+	btTransform pivot;
+	pivot.setIdentity();
+	pivot.setOrigin(localPivot);
 
-	//// add the constraint to the world
-	//m_pWorld->addConstraint(dof6, true);
+	//btSliderConstraint* sliderConstraint =  (btRigidBody& rbA,
+	//	btRigidBody& rbB,
+	//	const btTransform& frameInA,
+	//	const btTransform& frameInB,
+	//	bool useLinearReferenceFrameA);
 
-	//// store a pointer to our constraint
-	//m_pPickConstraint = dof6;
+	// create our constraint object
+	btGeneric6DofConstraint* dof6 = new btGeneric6DofConstraint(*m_pPickedBody,
+		pivot, true);
+	bool bLimitAngularMotion = true;
+	if (bLimitAngularMotion)
+	{
+		dof6->setAngularLowerLimit(btVector3(0, 0, 0));
+		dof6->setAngularUpperLimit(btVector3(0, 0, 0));
+	}
 
-	//// define the 'strength' of our constraint (each axis)
-	//float cfm = 0.5f;
-	//dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 0);
-	//dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 1);
-	//dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 2);
-	//dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 3);
-	//dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 4);
-	//dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 5);
+	// add the constraint to the world
+	world->addConstraint(dof6, true);
 
-	//// define the 'error reduction' of our constraint (each axis)
-	//float erp = 0.5f;
-	//dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 0);
-	//dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 1);
-	//dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 2);
-	//dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 3);
-	//dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 4);
-	//dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 5);
+	// store a pointer to our constraint
+	m_pPickConstraint = dof6;
 
-	//// save this data for future reference
-	//m_oldPickingDist = (output.hitPoint - m_cameraPosition).length();
+	// define the 'strength' of our constraint (each axis)
+	float cfm = 0.5f;
+	dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 0);
+	dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 1);
+	dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 2);
+	dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 3);
+	dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 4);
+	dof6->setParam(BT_CONSTRAINT_STOP_CFM, cfm, 5);
+
+	// define the 'error reduction' of our constraint (each axis)
+	float erp = 0.5f;
+	dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 0);
+	dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 1);
+	dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 2);
+	dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 3);
+	dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 4);
+	dof6->setParam(BT_CONSTRAINT_STOP_ERP, erp, 5);
+
+	// save this data for future reference
+	m_oldPickingDist = (output.hitPoint - cameraPosition).length();
 }
 
 void RemovePickingConstraint()
 {
-	//// exit in erroneous situations
-	//if (!m_pPickConstraint || !m_pWorld)
-	//	return;
+	// exit in erroneous situations
+	if (!m_pPickConstraint || !world)
+		return;
 
-	//// remove the constraint from the world
-	//m_pWorld->removeConstraint(m_pPickConstraint);
+	// remove the constraint from the world
+	world->removeConstraint(m_pPickConstraint);
 
-	//// delete the constraint object
-	//delete m_pPickConstraint;
+	// delete the constraint object
+	delete m_pPickConstraint;
 
-	//// reactivate the body
-	//m_pPickedBody->forceActivationState(ACTIVE_TAG);
-	//m_pPickedBody->setDeactivationTime(0.f);
+	// reactivate the body
+	m_pPickedBody->forceActivationState(ACTIVE_TAG);
+	m_pPickedBody->setDeactivationTime(0.f);
 
-	//// clear the pointers
-	//m_pPickConstraint = 0;
-	//m_pPickedBody = 0;
+	// clear the pointers
+	m_pPickConstraint = 0;
+	m_pPickedBody = 0;
 }
 
 //void BulletOpenGLApplication::CheckForCollisionEvents()
@@ -774,7 +886,7 @@ void mouseButtonCallback(int button, int state, int x, int y)
 	{
 		if (button == GLUT_LEFT_BUTTON)
 		{
-			//removePickingConstraint();
+			removePickingConstraint();
 			//remove p2p
 		}
 	}
@@ -841,26 +953,28 @@ void mouseMoveCallback(int x, int y)
 		movePickedBody(rayFrom, rayTo);
 	}
 
-	{
-		//if (m_pPickedBody)
-		//{
-		//	btGeneric6DofConstraint* pickCon =
-		//		static_cast<btGeneric6DofConstraint*>(m_pPickConstraint);
-		//	if (!pickCon)
-		//		return;
+	//{
+	//	if (m_pPickedBody)
+	//	{
+	//		btGeneric6DofConstraint* pickCon =
+	//			static_cast<btGeneric6DofConstraint*>(m_pPickConstraint);
+	//		if (!pickCon)
+	//			return;
 
-		//	// use another picking ray to get the target direction
-		//	btVector3 dir = GetPickingRay(x, y) - m_cameraPosition;
-		//	dir.normalize();
+	//		btVector3 cameraPosition = btVector3(camera->getLocation().x, camera->getLocation().y, camera->getLocation().z);
 
-		//	// use the same distance as when we originally picked the object
-		//	dir *= m_oldPickingDist;
-		//	btVector3 newPivot = m_cameraPosition + dir;
+	//		// use another picking ray to get the target direction
+	//		btVector3 dir = GetPickingRay(x, y) - cameraPosition;
+	//		dir.normalize();
 
-		//	// set the position of the constraint
-		//	pickCon->getFrameOffsetA().setOrigin(newPivot);
-		//}
-	}
+	//		// use the same distance as when we originally picked the object
+	//		dir *= m_oldPickingDist;
+	//		btVector3 newPivot = cameraPosition + dir;
+
+	//		// set the position of the constraint
+	//		pickCon->getFrameOffsetA().setOrigin(newPivot);
+	//	}
+	//}
 
 }
 
@@ -914,6 +1028,7 @@ int main(int argc, char **argv)
 	glutMouseFunc(mouseButtonCallback);
 	//glutPassiveMotionFunc(mouseMove);
 	glutPassiveMotionFunc(mouseMoveCallback);
+	glutMotionFunc(mouseMoveCallback);
 	//glutMouseFunc(mouseScroll);
 	
 

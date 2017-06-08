@@ -21,27 +21,96 @@ Cloth::~Cloth()
 
 btSoftBody* Cloth::CreateCloth(int fixed)
 {
-	const btScalar s = 4; //size of cloth patch
-	const int NUM_X = 31; //vertices on X axis
-	const int NUM_Z = 31; //vertices on Z axis
+	//TRACEDEMO
+	const btScalar	s = 5;
+	//psb->getWorldInfo()->m_gravity.setValue(0,0,0);
 
-						  //fixed = 1 + 2;
-						  //fixed = 0;
-	btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
-		btVector3(-s / 2, s + 1, 0),
-		btVector3(+s / 2, s + 1, 0),
-		btVector3(-s / 2, s + 1, +s),
-		btVector3(+s / 2, s + 1, +s),
-		NUM_X, NUM_Z,
-		fixed, true);
-	//body->getCollisionShape()->setMargin(0.001f);
-	body->generateBendingConstraints(2, body->appendMaterial());
-	body->setTotalMass(10);
-	//body->m_cfg.citerations = 10;
-	//body->m_cfg.diterations = 10;
-	body->m_cfg.piterations = 5;
-	body->m_cfg.kDP = 0.005f;
-	world->addSoftBody(body);
+	const int		segments = 10;
+	const int		count = 5;
+	btVector3 pos(-s*segments, 0, 0);
+	btScalar gap = 0.5;
+
+	btSoftBody*		body;
+
+	for (int i = 0; i < count; ++i)
+	{
+		/*btSoftBody*		*/body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(), btVector3(-s, 0, -s * 3),
+			btVector3(+s, 0, -s * 3),
+			btVector3(-s, 0, +s),
+			btVector3(+s, 0, +s),
+			segments, segments * 3,
+			1 + 2, true);
+
+		body->getCollisionShape()->setMargin(0.5);
+		btSoftBody::Material* pm = body->appendMaterial();
+		pm->m_kLST = 0.0004;
+		pm->m_flags -= btSoftBody::fMaterial::DebugDraw;
+		body->generateBendingConstraints(2, pm);
+
+		body->m_cfg.kLF = 0.05;
+		body->m_cfg.kDG = 0.01;
+
+		//psb->m_cfg.kLF			=	0.004;
+		//psb->m_cfg.kDG			=	0.0003;
+
+		body->m_cfg.piterations = 2;
+		body->m_cfg.aeromodel = btSoftBody::eAeroModel::V_TwoSidedLiftDrag;
+
+
+		body->setWindVelocity(btVector3(4, -12.0, -25.0));
+
+		btTransform		trs;
+		btQuaternion	rot;
+		pos += btVector3(s * 2 + gap, 0, 0);
+		rot.setRotation(btVector3(1, 0, 0), btScalar(SIMD_PI / 2));
+		trs.setIdentity();
+		trs.setOrigin(pos);
+		trs.setRotation(rot);
+		body->transform(trs);
+		body->setTotalMass(2.0);
+
+
+
+		//this could help performance in some cases
+		btSoftBodyHelpers::ReoptimizeLinkOrder(body);
+
+		world->addSoftBody(body);
+	}
+
+
+	//const btScalar s = 4; //size of cloth patch
+	//const int NUM_X = 31; //vertices on X axis
+	//const int NUM_Z = 31; //vertices on Z axis
+
+	//					  //fixed = 1 + 2;
+	//					  //fixed = 0;
+	//btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
+	//	btVector3(-s / 2, s + 1, 0),
+	//	btVector3(+s / 2, s + 1, 0),
+	//	btVector3(-s / 2, s + 1, +s),
+	//	btVector3(+s / 2, s + 1, +s),
+	//	NUM_X, NUM_Z,
+	//	fixed, true);
+	////body->getCollisionShape()->setMargin(0.001f);
+	//body->generateBendingConstraints(2, body->appendMaterial());
+	//body->setTotalMass(10);
+	////body->m_cfg.citerations = 10;
+	////body->m_cfg.diterations = 10;
+	//body->m_cfg.piterations = 5;
+	//body->m_cfg.kDP = 0.005f;
+
+	//btVector3 wind = body->getWindVelocity();
+	////body->rayTest
+	//body->m_cfg.aeromodel = btSoftBody::eAeroModel::V_TwoSidedLiftDrag;
+	////body->setWindVelocity(btVector3(4, -12.0, -25.0));
+	//body->setWindVelocity(btVector3(0.0f, 0.0f, 1000.0f));
+	//body->addAeroForceToFace(btVector3(0.0f, 0.0f, 1000.0f), 20);
+	//body->addAeroForceToNode(btVector3(0.0f, 0.0f, 1000.0f), 20);
+	//body->applyForces();
+
+	//world->addSoftBody(body);
+
+	//body->randomizeConstraints
 
 	//body->appendAnchor();
 
@@ -66,6 +135,10 @@ btSoftBody* Cloth::CreateCloth(int fixed)
 
 void Cloth::renderSoftbody(btSoftBody* b)
 {
+	b->addAeroForceToFace(btVector3(0.0f, 0.0f, 1000.0f), 50);
+	b->addAeroForceToNode(btVector3(0.0f, 0.0f, 1000.0f), 50);
+	b->applyForces();
+
 	//btSoftBodyHelpers::Draw(b, world->getDebugDrawer(), world->getDrawFlags());
 
 	glColor3f(0.0f, 1.0f, 0.0f);
