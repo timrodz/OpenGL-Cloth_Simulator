@@ -24,8 +24,10 @@ public:
 	//btSoftRigidDynamicsWorld*	getSoftDynamicsWorld();
 	//void createSoftBody(const btScalar size, const int num_x, const int num_z, const int fixed = 1 + 2);
 
-	btSoftBody* CreateCloth(int fixed);
+	btSoftBody* CreateCloth(int fixed, int width, int height, btScalar _s);
 	void renderSoftbody(btSoftBody* b);
+
+	btSoftBody* Cloth::WindyCloth(int fixed);
 
 	/*void setProgram(GLuint _program);
 	void setColor(glm::vec3 _color);
@@ -41,10 +43,13 @@ public:
 
 	glm::vec3 getDirection();*/
 
+	btSoftBody* softBody;
+
 private:
 
 	//	btSoftBodyWorldInfo softBodyWorldInfo;
 	btSoftRigidDynamicsWorld* world;
+	
 
 	//Camera* camera;
 	//ModelType type;

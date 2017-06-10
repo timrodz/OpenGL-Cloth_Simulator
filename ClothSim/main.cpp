@@ -91,6 +91,8 @@ btRigidBody* m_pPickedBody;				// the body we picked up
 btTypedConstraint* m_pPickConstraint;	// the constraint the body is attached to
 //btScalar m_oldPickingDist;// the distance from the camera to the hit point (so we can move the object up, down, left and right from our view)
 
+int gWidth = 31;
+int gHeight = 31;
 
 //set node position directly
 /*
@@ -152,7 +154,8 @@ void initPhysics()
 	bodies.push_back(cubeBody);
 
 	cloth = new Cloth(world);
-	btSoftBody* clothBody = cloth->CreateCloth(1 + 2);
+	btSoftBody* clothBody = cloth->CreateCloth(1 + 2, 31, 31, 1);
+	//btSoftBody* clothBody = cloth->WindyCloth(1 + 2);
 
 	//Cloth* cloth2 = new Cloth(world);
 	//btSoftBody* clothBody2 = cloth2->CreateCloth(0);
@@ -471,22 +474,92 @@ void FunctionKeyDown(int key, int x, int y)
 	switch (key)
 	{
 	case GLUT_KEY_F1:
+	{
+	//cloth falls down
+		world->removeSoftBody(cloth->softBody);
+		cloth = new Cloth(world);
+		btSoftBody* clothBody = cloth->CreateCloth(0, gWidth, gHeight, 1);
+	}
 		break;
 	case GLUT_KEY_F2:
+	{
+		//increase width
+		gWidth += 1;
+		world->removeSoftBody(cloth->softBody);
+		cloth = new Cloth(world);
+		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
+	}
 		break;
 	case GLUT_KEY_F3:
+	{
+		//decrease width
+		if (gWidth > 0)
+		{
+			gWidth -= 1;
+		}	
+		world->removeSoftBody(cloth->softBody);
+		cloth = new Cloth(world);
+		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
+	}
 		break;
 	case GLUT_KEY_F4:
+	{
+		//increase height
+		gHeight += 1;
+		world->removeSoftBody(cloth->softBody);
+		cloth = new Cloth(world);
+		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
+	}
 		break;
 	case GLUT_KEY_F5:
+	{
+		//decrease height
+		if (gHeight > 0)
+		{
+			gHeight -= 1;
+		}
+		world->removeSoftBody(cloth->softBody);
+		cloth = new Cloth(world);
+		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
+	}
 		break;
 	case GLUT_KEY_F6:
+	{
+		//fan creates wind
+		world->removeSoftBody(cloth->softBody);
+		cloth = new Cloth(world);
+		btSoftBody* clothBody = cloth->WindyCloth(1 + 2);
+	}
 		break;
 	case GLUT_KEY_F7:
+		//increase wind
+		for (int i = 0; i < world->getSoftBodyArray().size(); i++)
+		{
+			//cloth->renderSoftbody(world->getSoftBodyArray()[i]);
+			btVector3 windVelocity = world->getSoftBodyArray()[i]->getWindVelocity();
+			windVelocity += btVector3(0, 0, -5);
+			world->getSoftBodyArray()[i]->setWindVelocity(windVelocity);
+		}
 		break;
 	case GLUT_KEY_F8:
+		//decrease wind
+		for (int i = 0; i < world->getSoftBodyArray().size(); i++)
+		{
+			btVector3 windVelocity = world->getSoftBodyArray()[i]->getWindVelocity();
+			windVelocity += btVector3(0, 0, 5);
+			world->getSoftBodyArray()[i]->setWindVelocity(windVelocity);
+		}
+		break;
+	case GLUT_KEY_F9:
+		break;
+	case GLUT_KEY_F10:
+		break;
+	case GLUT_KEY_F11:
+		break;
+	case GLUT_KEY_F12:
 		break;
 	}
+
 }
 
 void FunctionKeyUp(int key, int x, int y)
@@ -1015,7 +1088,7 @@ int main(int argc, char **argv)
 	
 	glutKeyboardFunc(keyboard);
 
-	//glutSpecialFunc(FunctionKeyDown);
+	glutSpecialFunc(FunctionKeyDown);
 	//glutSpecialUpFunc(FunctionKeyUp);
 
 

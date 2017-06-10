@@ -35,7 +35,8 @@ void CPlane::renderPlane(btRigidBody* plane)
 	{
 		return;
 	}
-	glColor3f(0.8, 0.8, 0.8);
+	//glColor3f(0.8, 0.8, 0.8);
+	glColor3f(0, 0, 0);
 
 	btTransform t;
 	plane->getMotionState()->getWorldTransform(t);
