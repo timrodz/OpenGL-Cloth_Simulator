@@ -11,6 +11,7 @@
 //
 
 #include <iostream>
+#include <string>
 
 #include "btBulletDynamicsCommon.h"
 #include "BulletSoftBody\btSoftRigidDynamicsWorld.h"
@@ -75,11 +76,14 @@ Cloth* cloth;
 CCylinder* cylinder;
 CCone* cone;
 CCube* cube;
+CCube* widthSlider;
+CCube* lengthSlider;
+CCube* fanSpeedSlider;
 
 float gNear = 1.0f;
 float gFar = 1000.0f;
 
-//btSoftBody* m_pickedBody;
+btSoftBody* pSoftBody;
 btRigidBody* m_pickedBody;
 btTypedConstraint* m_pickedConstraint;
 int	m_savedState;
@@ -91,8 +95,19 @@ btRigidBody* m_pPickedBody;				// the body we picked up
 btTypedConstraint* m_pPickConstraint;	// the constraint the body is attached to
 //btScalar m_oldPickingDist;// the distance from the camera to the hit point (so we can move the object up, down, left and right from our view)
 
-int gWidth = 31;
-int gHeight = 31;
+int gWidth = 2;
+int gHeight = 1;
+
+bool m_drag = false;
+//bool								m_autocam;
+bool m_cutting = true;
+//bool								m_raycast;
+//btScalar							m_animtime;
+//btClock								m_clock;
+btVector3							m_impact;
+btSoftBody::sRayCast				m_results;
+btSoftBody::Node*					m_node;
+btVector3							m_goal;
 
 //set node position directly
 /*
@@ -106,6 +121,19 @@ struct RayResult
 	btRigidBody* pBody;
 	btVector3 hitPoint;
 };
+
+struct	ImplicitSphere : btSoftBody::ImplicitFn
+{
+	btVector3	center;
+	btScalar	sqradius;
+	ImplicitSphere() {}
+	ImplicitSphere(const btVector3& c, btScalar r) : center(c), sqradius(r*r) {}
+	btScalar	Eval(const btVector3& x)
+	{
+		return((x - center).length2() - sqradius);
+	}
+};
+
 
 void createEmptyDynamicsWorld()
 {
@@ -127,6 +155,94 @@ void createEmptyDynamicsWorld()
 	softBodyWorldInfo.m_dispatcher = dispatcher;
 	softBodyWorldInfo.m_gravity = world->getGravity();
 	softBodyWorldInfo.m_sparsesdf.Initialize();
+}
+
+btVector3 getRayTo(int x, int y)
+{
+	// calculate the field-of-view
+	float tanFov = 1.0f / gNear;
+	float fov = btScalar(2.0) * btAtan(tanFov);
+
+	glm::vec3 cameraLoc = camera->getLocation();
+	glm::vec3 cameraFront = camera->getVector();
+	btVector3 cameraPosition = btVector3(cameraLoc.x, cameraLoc.y, cameraLoc.z);
+	btVector3 cameraTarget = btVector3(cameraFront.x, cameraFront.y, cameraFront.z);
+
+	// get a ray pointing forward from the 
+	// camera and extend it to the far plane	
+	btVector3 rayFrom = cameraPosition;
+	btVector3 rayForward = (cameraTarget - cameraPosition);
+	rayForward.normalize();
+	rayForward *= gFar;
+
+	glm::vec3 cameraUp = camera->getCameraUp();
+	// find the horizontal and vertical vectors 
+	// relative to the current camera view
+	btVector3 ver = btVector3(cameraUp.x, cameraUp.y, cameraUp.z);
+	btVector3 hor = rayForward.cross(ver);
+	hor.normalize();
+	ver = hor.cross(rayForward);
+	ver.normalize();
+	hor *= 2.f * gFar * tanFov;
+	ver *= 2.f * gFar * tanFov;
+
+	// calculate the aspect ratio
+	btScalar aspect = Utils::WIDTH / (btScalar)Utils::HEIGHT;
+
+	// adjust the forward-ray based on
+	// the X/Y coordinates that were clicked
+	hor *= aspect;
+	btVector3 rayToCenter = rayFrom + rayForward;
+	btVector3 dHor = hor * 1.f / float(Utils::WIDTH);
+	btVector3 dVert = ver * 1.f / float(Utils::HEIGHT);
+	btVector3 rayTo = rayToCenter - 0.5f * hor + 0.5f * ver;
+	rayTo += btScalar(x) * dHor;
+	rayTo -= btScalar(y) * dVert;
+
+	// return the final result
+	return rayTo;
+}
+
+void pickingPreTickCallback(btDynamicsWorld *world, btScalar timeStep)
+{
+	//SoftDemo* softDemo = world->getWorldUserInfo();
+
+	if (m_drag)
+	{
+		const int				x = lastX;
+		const int				y = lastY;
+
+		glm::vec3 cameraLoc = camera->getLocation();
+		glm::vec3 cameraFront = camera->getVector();
+
+		btVector3 cameraTargetPosition(cameraFront.x, cameraFront.y, cameraFront.z);
+
+		const btVector3	cameraPosition(cameraLoc.x, cameraLoc.y, cameraLoc.z);
+		const btVector3	rayFrom = cameraPosition;
+
+		const btVector3	rayTo = getRayTo(x, y);
+		const btVector3	rayDir = (rayTo - rayFrom).normalized();
+		const btVector3	N = (cameraTargetPosition - cameraPosition).normalized();
+		const btScalar	O = btDot(m_impact, N);
+		const btScalar	den = btDot(N, rayDir);
+		if ((den*den)>0)
+		{
+			const btScalar			num = O - btDot(N, rayFrom);
+			const btScalar			hit = num / den;
+			if ((hit>0) && (hit<1500))
+			{
+				m_goal = rayFrom + rayDir*hit;
+			}
+		}
+		btVector3 delta = m_goal - m_node->m_x;
+		static const btScalar	maxdrag = 10;
+		if (delta.length2() >(maxdrag * maxdrag))
+		{
+			delta = delta.normalized()*maxdrag;
+		}
+		m_node->m_v += delta / timeStep;
+	}
+
 }
 
 void initPhysics()
@@ -154,7 +270,7 @@ void initPhysics()
 	bodies.push_back(cubeBody);
 
 	cloth = new Cloth(world);
-	btSoftBody* clothBody = cloth->CreateCloth(1 + 2, 31, 31, 1);
+	btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
 	//btSoftBody* clothBody = cloth->WindyCloth(1 + 2);
 
 	//Cloth* cloth2 = new Cloth(world);
@@ -195,6 +311,35 @@ void initPhysics()
 	//	const btTransform& frameInB,
 	//	bool useLinearReferenceFrameA);
 
+	//ground = new CPlane(world);
+	//btRigidBody* groundBody = ground->CreatePlane();
+	//bodies.push_back(groundBody);
+
+	cube = new CCube(world);
+	cubeBody = cube->CreateCube(1, 0.1, 0, -2, 3.9, 2, 0.0);
+	bodies.push_back(cubeBody);
+
+	cube = new CCube(world);
+	cubeBody = cube->CreateCube(1, 0.1, 0, -2, 3.5, 2, 0.0);
+	bodies.push_back(cubeBody);
+
+	cube = new CCube(world);
+	cubeBody = cube->CreateCube(1, 0.1, 0, 2.4, 3.9, 2, 0.0);
+	bodies.push_back(cubeBody);
+
+	widthSlider = new CCube(world);
+	cubeBody = widthSlider->CreateCube(0.1, 0.25, 0, -2, 3.9, 2, 0.0);
+	bodies.push_back(cubeBody);
+
+	lengthSlider = new CCube(world);
+	cubeBody = lengthSlider->CreateCube(0.1, 0.25, 0, -2, 3.5, 2, 0.0);
+	bodies.push_back(cubeBody);
+
+	fanSpeedSlider = new CCube(world);
+	cubeBody = fanSpeedSlider->CreateCube(0.1, 0.25, 0, 2.4, 3.9, 2, 0.0);
+	bodies.push_back(cubeBody);
+
+	world->setInternalTickCallback(pickingPreTickCallback, world->getWorldUserInfo(), true);
 }
 
 void init()
@@ -246,6 +391,7 @@ void init()
 
 	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
 
+	
 }
 
 void reset()
@@ -337,6 +483,25 @@ void update()
 	glutPostRedisplay(); // the render function is called
 }
 
+//std::string s = "Some text";
+//void * font = GLUT_BITMAP_9_BY_15;
+//for (auto i = s.begin(); i != s.end(); ++i)
+//{
+//	char c = *i;
+//	glColor3d(1.0, 0.0, 0.0);
+//	glutBitmapCharacter(font, c);
+//}
+
+void RenderString(GLdouble x, GLdouble y, const std::string &string)
+{
+	glColor3d(0.0, 0.0, 1.0);
+	glRasterPos2d(x, y);
+	for (int n = 0; n<string.size(); ++n) 
+	{
+		glutBitmapCharacter(/*GLUT_BITMAP_HELVETICA_18*/  GLUT_BITMAP_TIMES_ROMAN_24, string[n]);
+	}
+}
+
 void display()
 {
 	// Clear the screen with the blue color set in the init
@@ -397,9 +562,18 @@ void display()
 		cloth->renderSoftbody(world->getSoftBodyArray()[i]);
 	}
 
+	
+
+	RenderString(-5, 5.7, "Width");
+	RenderString(-5, 5.1, "Length");
+
+	RenderString(2, 5.7, "Fan Speed");
+
 	glutSwapBuffers();
 	glutPostRedisplay();
 }
+
+
 
 
 void keyboard(unsigned char key, int x, int y)
@@ -493,7 +667,7 @@ void FunctionKeyDown(int key, int x, int y)
 	case GLUT_KEY_F3:
 	{
 		//decrease width
-		if (gWidth > 0)
+		if (gWidth > 1)
 		{
 			gWidth -= 1;
 		}	
@@ -505,7 +679,7 @@ void FunctionKeyDown(int key, int x, int y)
 	case GLUT_KEY_F4:
 	{
 		//increase height
-		gHeight += 1;
+		gHeight -= 1;
 		world->removeSoftBody(cloth->softBody);
 		cloth = new Cloth(world);
 		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
@@ -514,9 +688,9 @@ void FunctionKeyDown(int key, int x, int y)
 	case GLUT_KEY_F5:
 	{
 		//decrease height
-		if (gHeight > 0)
+		if (gHeight < 4)
 		{
-			gHeight -= 1;
+			gHeight += 1;
 		}
 		world->removeSoftBody(cloth->softBody);
 		cloth = new Cloth(world);
@@ -635,51 +809,7 @@ void removePickingConstraint()
 	}
 }
 
-btVector3 getRayTo(int x, int y)
-{
-	// calculate the field-of-view
-	float tanFov = 1.0f / gNear;
-	float fov = btScalar(2.0) * btAtan(tanFov);
 
-	glm::vec3 cameraLoc = camera->getLocation();
-	glm::vec3 cameraFront = camera->getVector();
-	btVector3 cameraPosition = btVector3(cameraLoc.x, cameraLoc.y, cameraLoc.z);
-	btVector3 cameraTarget = btVector3(cameraFront.x, cameraFront.y, cameraFront.z);
-
-	// get a ray pointing forward from the 
-	// camera and extend it to the far plane	
-	btVector3 rayFrom = cameraPosition;
-	btVector3 rayForward = (cameraTarget - cameraPosition);
-	rayForward.normalize();
-	rayForward *= gFar;
-
-	glm::vec3 cameraUp = camera->getCameraUp();
-	// find the horizontal and vertical vectors 
-	// relative to the current camera view
-	btVector3 ver = btVector3(cameraUp.x, cameraUp.y, cameraUp.z);
-	btVector3 hor = rayForward.cross(ver);
-	hor.normalize();
-	ver = hor.cross(rayForward);
-	ver.normalize();
-	hor *= 2.f * gFar * tanFov;
-	ver *= 2.f * gFar * tanFov;
-
-	// calculate the aspect ratio
-	btScalar aspect = Utils::WIDTH / (btScalar)Utils::HEIGHT;
-
-	// adjust the forward-ray based on
-	// the X/Y coordinates that were clicked
-	hor *= aspect;
-	btVector3 rayToCenter = rayFrom + rayForward;
-	btVector3 dHor = hor * 1.f / float(Utils::WIDTH);
-	btVector3 dVert = ver * 1.f / float(Utils::HEIGHT);
-	btVector3 rayTo = rayToCenter - 0.5f * hor + 0.5f * ver;
-	rayTo += btScalar(x) * dHor;
-	rayTo -= btScalar(y) * dVert;
-
-	// return the final result
-	return rayTo;
-}
 
 bool Raycast(const btVector3 &startPosition, const btVector3 &direction, RayResult &output, bool includeStatic)
 {
@@ -936,6 +1066,8 @@ void RemovePickingConstraint()
 //	m_pairsLastUpdate = pairsThisUpdate;
 //}
 
+
+
 void mouseButtonCallback(int button, int state, int x, int y)
 {
 	if (state == GLUT_DOWN)
@@ -1018,12 +1150,30 @@ bool movePickedBody(const btVector3& rayFromWorld, const btVector3& rayToWorld)
 
 void mouseMoveCallback(int x, int y)
 {
+	btVector3 rayTo = getRayTo(int(x), int(y));
+
+	btVector3 rayFrom = btVector3(camera->getLocation().x, camera->getLocation().y, camera->getLocation().z);
+
+	movePickedBody(rayFrom, rayTo);
+
+
+	if (m_node && (m_results.fraction < 1.f))
 	{
-		btVector3 rayTo = getRayTo(int(x), int(y));
-
-		btVector3 rayFrom = btVector3(camera->getLocation().x, camera->getLocation().y, camera->getLocation().z);
-
-		movePickedBody(rayFrom, rayTo);
+		if (!m_drag)
+		{
+		//square the number
+#define SQ(_x_) (_x_)*(_x_)
+			if ((SQ(x - lastX) + SQ(y - lastY)) > 6)
+			{
+				m_drag = true;
+			}
+#undef SQ
+		}
+		if (m_drag)
+		{
+			lastX = x;
+			lastY = y;
+		}
 	}
 
 	//{
@@ -1049,6 +1199,98 @@ void mouseMoveCallback(int x, int y)
 	//	}
 	//}
 
+}
+
+void mouseFunc(int button, int state, int x, int y)
+{
+	if (button == GLUT_LEFT_BUTTON)
+	{
+		switch (state)
+		{
+		case	GLUT_DOWN:
+		{
+			m_results.fraction = 1.f;
+			mouseButtonCallback(button, state, x, y);
+			if (!m_pickedConstraint)
+			{
+				glm::vec3 cameraLoc = camera->getLocation();
+
+				const btVector3			rayFrom(cameraLoc.x, cameraLoc.y, cameraLoc.z);
+				const btVector3			rayTo = getRayTo(x, y);
+				const btVector3			rayDir = (rayTo - rayFrom).normalized();
+				btSoftBodyArray&		sbs = world->getSoftBodyArray();
+				for (int ib = 0; ib<sbs.size(); ++ib)
+				{
+					btSoftBody*				psb = sbs[ib];
+					btSoftBody::sRayCast	res;
+					if (psb->rayTest(rayFrom, rayTo, res))
+					{
+						m_results = res;
+					}
+				}
+				if (m_results.fraction<1.f)
+				{
+					m_impact = rayFrom + (rayTo - rayFrom)*m_results.fraction;
+					m_drag = m_cutting ? false : true;
+					lastX = x;
+					lastY = y;
+					m_node = 0;
+					switch (m_results.feature)
+					{
+					case btSoftBody::eFeature::Tetra:
+					{
+						btSoftBody::Tetra&	tet = m_results.body->m_tetras[m_results.index];
+						m_node = tet.m_n[0];
+						for (int i = 1; i<4; ++i)
+						{
+							if ((m_node->m_x - m_impact).length2()>
+								(tet.m_n[i]->m_x - m_impact).length2())
+							{
+								m_node = tet.m_n[i];
+							}
+						}
+						break;
+					}
+					case	btSoftBody::eFeature::Face:
+					{
+						btSoftBody::Face&	f = m_results.body->m_faces[m_results.index];
+						m_node = f.m_n[0];
+						for (int i = 1; i<3; ++i)
+						{
+							if ((m_node->m_x - m_impact).length2()>
+								(f.m_n[i]->m_x - m_impact).length2())
+							{
+								m_node = f.m_n[i];
+							}
+						}
+					}
+					break;
+					}
+					if (m_node) m_goal = m_node->m_x;
+					return;
+				}
+			}
+		}
+		break;
+		case	GLUT_UP:
+			if ((!m_drag) && m_cutting && (m_results.fraction<1.f))
+			{
+				ImplicitSphere	isphere(m_impact, 1);
+				printf("Mass before: %f\r\n", m_results.body->getTotalMass());
+				m_results.body->refine(&isphere, 0.0001, true);
+				printf("Mass after: %f\r\n", m_results.body->getTotalMass());
+			}
+			m_results.fraction = 1.f;
+			m_drag = false;
+
+			mouseButtonCallback(button, state, x, y);
+			break;
+		}
+	}
+	else
+	{
+		mouseButtonCallback(button, state, x, y);
+	}
 }
 
 bool callbackFunc(btManifoldPoint& cp, const btCollisionObject* obj1, int id1, int index1, const btCollisionObject* obj2, int id2, int index2)
@@ -1098,7 +1340,8 @@ int main(int argc, char **argv)
 	//glutKeyboardFunc(keyboard);
 	glutKeyboardUpFunc(keyboard_up);
 	
-	glutMouseFunc(mouseButtonCallback);
+	glutMouseFunc(mouseFunc);
+	//glutMouseFunc(mouseButtonCallback);
 	//glutPassiveMotionFunc(mouseMove);
 	glutPassiveMotionFunc(mouseMoveCallback);
 	glutMotionFunc(mouseMoveCallback);

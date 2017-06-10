@@ -1,3 +1,5 @@
+
+
 #include "Cloth.h"
 
 #include "Camera.h"
@@ -22,14 +24,18 @@ Cloth::~Cloth()
 btSoftBody* Cloth::CreateCloth(int fixed, int width, int height, btScalar _s)
 {
 	const btScalar s = 4; //size of cloth patch
-	const int NUM_X = width; //vertices on X axis
-	const int NUM_Z = height; //vertices on Z axis
+	const int NUM_X = 31; //vertices on X axis
+	const int NUM_Z = 31; //vertices on Z axis
 
 	btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
-		btVector3(-s / 2, s + 1, 0),
+		/*btVector3(-s / 2, s + 1, 0),
 		btVector3(+s / 2, s + 1, 0),
 		btVector3(-s / 2, s + 1, +s),
-		btVector3(+s / 2, s + 1, +s),
+		btVector3(+s / 2, s + 1, +s),*/
+		btVector3(-width, s + 1, 0),
+		btVector3(+width, s + 1, 0),
+		btVector3(-width, +height, 0),
+		btVector3(+width, +height, 0),
 		NUM_X, NUM_Z,
 		fixed, true);
 	//body->getCollisionShape()->setMargin(0.001f);
@@ -190,6 +196,76 @@ void Cloth::renderSoftbody(btSoftBody* b)
 	}
 	glEnd();*/
 }
+
+//btRigidBody*	createRigidBody(float mass, const btTransform& startTransform, btCollisionShape* shape, const btVector4& color = btVector4(1, 0, 0, 1))
+//{
+//	btAssert((!shape || shape->getShapeType() != INVALID_SHAPE_PROXYTYPE));
+//
+//	//rigidbody is dynamic if and only if mass is non zero, otherwise static
+//	bool isDynamic = (mass != 0.f);
+//
+//	btVector3 localInertia(0, 0, 0);
+//	if (isDynamic)
+//		shape->calculateLocalInertia(mass, localInertia);
+//
+//	//using motionstate is recommended, it provides interpolation capabilities, and only synchronizes 'active' objects
+//
+//#define USE_MOTIONSTATE 1
+//#ifdef USE_MOTIONSTATE
+//	btDefaultMotionState* myMotionState = new btDefaultMotionState(startTransform);
+//
+//	btRigidBody::btRigidBodyConstructionInfo cInfo(mass, myMotionState, shape, localInertia);
+//
+//	btRigidBody* body = new btRigidBody(cInfo);
+//	//body->setContactProcessingThreshold(m_defaultContactProcessingThreshold);
+//
+//#else
+//	btRigidBody* body = new btRigidBody(mass, 0, shape, localInertia);
+//	body->setWorldTransform(startTransform);
+//#endif//
+//
+//	body->setUserIndex(-1);
+//	world->addRigidBody(body);
+//	return body;
+//}
+//
+//void Cloth::Init_CapsuleCollision()
+//{
+//	//TRACEDEMO
+//	const btScalar	s = 4;
+//	const btScalar	h = 6;
+//	const int		r = 20;
+//
+//	btTransform startTransform;
+//	startTransform.setIdentity();
+//	startTransform.setOrigin(btVector3(0, h - 2, 0));
+//
+//	btCollisionShape* capsuleShape = new btCapsuleShapeX(1, 5);
+//	capsuleShape->setMargin(0.5);
+//
+//	//	capsule->setLocalScaling(btVector3(5,1,1));
+//	//	btRigidBody*		body=pdemo->createRigidBody(20,startTransform,capsuleShape);
+//	btRigidBody*		body = CommonRigidBodyBase::createRigidBody(0, startTransform, capsuleShape);
+//	body->setFriction(0.8f);
+//
+//	int fixed = 0;//4+8;
+//	btSoftBody*		psb = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(), btVector3(-s, h, -s),
+//		btVector3(+s, h, -s),
+//		btVector3(-s, h, +s),
+//		btVector3(+s, h, +s), r, r, fixed, true);
+//	world->addSoftBody(psb);
+//	psb->setTotalMass(0.1);
+//
+//	psb->m_cfg.piterations = 10;
+//	psb->m_cfg.citerations = 10;
+//	psb->m_cfg.diterations = 10;
+//	//	psb->m_cfg.viterations = 10;
+//
+//
+//	//	psb->appendAnchor(0,body);
+//	//	psb->appendAnchor(r-1,body);
+//	//	pdemo->m_cutting=true;
+//}
 
 //Cloth::Cloth(std::vector<Position> _vecPosition, Camera* _camera)
 //{

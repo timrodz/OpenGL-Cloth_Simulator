@@ -28,6 +28,8 @@ public:
 	void renderSoftbody(btSoftBody* b);
 
 	btSoftBody* Cloth::WindyCloth(int fixed);
+	void Init_CapsuleCollision();
+
 
 	/*void setProgram(GLuint _program);
 	void setColor(glm::vec3 _color);
