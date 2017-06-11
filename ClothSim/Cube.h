@@ -18,7 +18,17 @@ public:
 
 	void renderCube(btRigidBody* cube);
 
+	void move(float _fDirection);
+	void moveRight();
+	void moveLeft();
+
+	void setPosition(int _iPosition);
+
 private:
 
 	btSoftRigidDynamicsWorld* world;
+
+	btRigidBody* m_pRigidbody;
+
+	int m_iPosition = 2;
 };

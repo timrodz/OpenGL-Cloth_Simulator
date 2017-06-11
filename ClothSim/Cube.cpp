@@ -27,6 +27,8 @@ btRigidBody* CCube::CreateCube(float width, float height, float depth, float x, 
 	world->addRigidBody(body);
 	//bodies.push_back(body);
 
+	m_pRigidbody = body;
+
 	return body;
 }
 
@@ -87,4 +89,32 @@ void CCube::renderCube(btRigidBody* sphere)
 	glEnd();
 
 	glPopMatrix();
+}
+
+void CCube::moveRight()
+{
+		move(0.2f);
+}
+
+void CCube::moveLeft()
+{
+	move(-0.2f);
+}
+
+void CCube::move(float _fDirection)
+{
+	btTransform worldTransform;
+	m_pRigidbody->getMotionState()->getWorldTransform(worldTransform);
+	btVector3 worldTransformOrigin = worldTransform.getOrigin();
+
+	btTransform newTransform;
+	newTransform.setIdentity();
+	newTransform.setOrigin(worldTransformOrigin + btVector3(_fDirection, 0, 0));
+
+	m_pRigidbody->getMotionState()->setWorldTransform(newTransform);
+}
+
+void CCube::setPosition(int _iPosition)
+{
+	m_iPosition = _iPosition;
 }

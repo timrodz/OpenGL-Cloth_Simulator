@@ -97,6 +97,7 @@ btTypedConstraint* m_pPickConstraint;	// the constraint the body is attached to
 
 int gWidth = 2;
 int gHeight = 1;
+int gFanSpeed = 3;
 
 bool m_drag = false;
 //bool								m_autocam;
@@ -164,7 +165,7 @@ btVector3 getRayTo(int x, int y)
 	float fov = btScalar(2.0) * btAtan(tanFov);
 
 	glm::vec3 cameraLoc = camera->getLocation();
-	glm::vec3 cameraFront = camera->getVector();
+	glm::vec3 cameraFront = camera->getLocation() + camera->getVector();
 	btVector3 cameraPosition = btVector3(cameraLoc.x, cameraLoc.y, cameraLoc.z);
 	btVector3 cameraTarget = btVector3(cameraFront.x, cameraFront.y, cameraFront.z);
 
@@ -270,7 +271,7 @@ void initPhysics()
 	bodies.push_back(cubeBody);
 
 	cloth = new Cloth(world);
-	btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
+	btSoftBody* clothBody = cloth->CreateCloth(1 , gWidth, gHeight, 1);
 	//btSoftBody* clothBody = cloth->WindyCloth(1 + 2);
 
 	//Cloth* cloth2 = new Cloth(world);
@@ -300,10 +301,10 @@ void initPhysics()
 	body4->setLinearVelocity(btVector3(-1.0f, 0, 0));
 
 	//clothBody->appendAnchor(0, body);
-	//clothBody->appendAnchor(7, body1);
-	//clothBody->appendAnchor(14, body2);
-	//clothBody->appendAnchor(21, body3);
-	//clothBody->appendAnchor(28, body4);
+	clothBody->appendAnchor(7, body1);
+	clothBody->appendAnchor(14, body2);
+	clothBody->appendAnchor(21, body3);
+	clothBody->appendAnchor(28, body4);
 
 	//btSliderConstraint(btRigidBody& rbA,
 	//	btRigidBody& rbB,
@@ -328,15 +329,15 @@ void initPhysics()
 	bodies.push_back(cubeBody);
 
 	widthSlider = new CCube(world);
-	cubeBody = widthSlider->CreateCube(0.1, 0.25, 0, -2, 3.9, 2, 0.0);
+	cubeBody = widthSlider->CreateCube(0.05, 0.25, 0, -2 - 0.2, 3.9, 2, 0.0);
 	bodies.push_back(cubeBody);
 
 	lengthSlider = new CCube(world);
-	cubeBody = lengthSlider->CreateCube(0.1, 0.25, 0, -2, 3.5, 2, 0.0);
+	cubeBody = lengthSlider->CreateCube(0.05, 0.25, 0, -2 + 0.2, 3.5, 2, 0.0);
 	bodies.push_back(cubeBody);
 
 	fanSpeedSlider = new CCube(world);
-	cubeBody = fanSpeedSlider->CreateCube(0.1, 0.25, 0, 2.4, 3.9, 2, 0.0);
+	cubeBody = fanSpeedSlider->CreateCube(0.05, 0.25, 0, 2.4, 3.9, 2, 0.0);
 	bodies.push_back(cubeBody);
 
 	world->setInternalTickCallback(pickingPreTickCallback, world->getWorldUserInfo(), true);
@@ -391,7 +392,7 @@ void init()
 
 	glLightModeli(GL_LIGHT_MODEL_TWO_SIDE, GL_TRUE);
 
-	
+	camera->setLocation(glm::vec3(0, 1, 5));	//the player will be top of the terrain
 }
 
 void reset()
@@ -657,20 +658,25 @@ void FunctionKeyDown(int key, int x, int y)
 		break;
 	case GLUT_KEY_F2:
 	{
-		//increase width
-		gWidth += 1;
-		world->removeSoftBody(cloth->softBody);
-		cloth = new Cloth(world);
-		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
-	}
-		break;
-	case GLUT_KEY_F3:
-	{
 		//decrease width
 		if (gWidth > 1)
 		{
 			gWidth -= 1;
-		}	
+			widthSlider->moveLeft();
+		}
+		world->removeSoftBody(cloth->softBody);
+		cloth = new Cloth(world);
+		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);	
+	}
+		break;
+	case GLUT_KEY_F3:
+	{
+		//increase width
+		if (gWidth <= 4)
+		{
+			gWidth += 1;
+			widthSlider->moveRight();
+		}		
 		world->removeSoftBody(cloth->softBody);
 		cloth = new Cloth(world);
 		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
@@ -678,8 +684,12 @@ void FunctionKeyDown(int key, int x, int y)
 		break;
 	case GLUT_KEY_F4:
 	{
-		//increase height
-		gHeight -= 1;
+		//decrease height
+		if (gHeight < 4)
+		{
+			gHeight += 1;
+			lengthSlider->moveLeft();
+		}
 		world->removeSoftBody(cloth->softBody);
 		cloth = new Cloth(world);
 		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
@@ -687,14 +697,15 @@ void FunctionKeyDown(int key, int x, int y)
 		break;
 	case GLUT_KEY_F5:
 	{
-		//decrease height
-		if (gHeight < 4)
+		//increase height
+		if (gHeight >= 1)
 		{
-			gHeight += 1;
+			gHeight -= 1;
+			lengthSlider->moveRight();
 		}
 		world->removeSoftBody(cloth->softBody);
 		cloth = new Cloth(world);
-		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);
+		btSoftBody* clothBody = cloth->CreateCloth(1 + 2, gWidth, gHeight, 1);		
 	}
 		break;
 	case GLUT_KEY_F6:
@@ -706,22 +717,34 @@ void FunctionKeyDown(int key, int x, int y)
 	}
 		break;
 	case GLUT_KEY_F7:
-		//increase wind
-		for (int i = 0; i < world->getSoftBodyArray().size(); i++)
+		//decrease wind
+		if (gFanSpeed > 1)
 		{
-			//cloth->renderSoftbody(world->getSoftBodyArray()[i]);
-			btVector3 windVelocity = world->getSoftBodyArray()[i]->getWindVelocity();
-			windVelocity += btVector3(0, 0, -5);
-			world->getSoftBodyArray()[i]->setWindVelocity(windVelocity);
+			for (int i = 0; i < world->getSoftBodyArray().size(); i++)
+			{
+				btVector3 windVelocity = world->getSoftBodyArray()[i]->getWindVelocity();
+				windVelocity += btVector3(0, 0, 10);
+				world->getSoftBodyArray()[i]->setWindVelocity(windVelocity);
+
+				fanSpeedSlider->moveLeft();
+			}
+			gFanSpeed--;
 		}
 		break;
-	case GLUT_KEY_F8:
-		//decrease wind
-		for (int i = 0; i < world->getSoftBodyArray().size(); i++)
+	case GLUT_KEY_F8:	
+		//increase wind
+		if (gFanSpeed <= 4)
 		{
-			btVector3 windVelocity = world->getSoftBodyArray()[i]->getWindVelocity();
-			windVelocity += btVector3(0, 0, 5);
-			world->getSoftBodyArray()[i]->setWindVelocity(windVelocity);
+			for (int i = 0; i < world->getSoftBodyArray().size(); i++)
+			{
+				//cloth->renderSoftbody(world->getSoftBodyArray()[i]);
+				btVector3 windVelocity = world->getSoftBodyArray()[i]->getWindVelocity();
+				windVelocity += btVector3(0, 0, -10);
+				world->getSoftBodyArray()[i]->setWindVelocity(windVelocity);
+
+				fanSpeedSlider->moveRight();
+			}
+			gFanSpeed++;
 		}
 		break;
 	case GLUT_KEY_F9:
@@ -1320,7 +1343,7 @@ int main(int argc, char **argv)
 	//gContactAddedCallback = callbackFunc;
 
 	//glTranslatef(0, -1, -5);
-	camera->setLocation(glm::vec3(0, 1, 5));	//the player will be top of the terrain
+	
 
 	// Link the window to the rest of the code
 	glutIdleFunc(update);
