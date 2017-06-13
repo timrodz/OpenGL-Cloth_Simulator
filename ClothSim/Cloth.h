@@ -24,10 +24,11 @@ public:
 	//btSoftRigidDynamicsWorld*	getSoftDynamicsWorld();
 	//void createSoftBody(const btScalar size, const int num_x, const int num_z, const int fixed = 1 + 2);
 
+	btSoftBody* FallingCloth(int fixed, int width, int height, btScalar _s);
 	btSoftBody* CreateCloth(int fixed, int width, int height, btScalar _s);
 	void renderSoftbody(btSoftBody* b);
 
-	btSoftBody* Cloth::WindyCloth(int fixed);
+	btSoftBody* WindyCloth(int fixed);
 	void Init_CapsuleCollision();
 
 

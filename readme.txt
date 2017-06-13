@@ -9,6 +9,8 @@ F6: Turns on the fan
 F7: Decreases the fan's speed
 F8: Increases the fan's speed
 
+Press R to reset the scene.
+
 Mouse Click and drag the cloth, while pressing down the left mouse button.
 To tear the cloth and create holes, just click on the cloth.
 

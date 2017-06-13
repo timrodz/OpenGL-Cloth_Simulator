@@ -21,6 +21,35 @@ Cloth::~Cloth()
 {
 }
 
+btSoftBody* Cloth::FallingCloth(int fixed, int width, int height, btScalar _s)
+{
+	const btScalar s = 4; //size of cloth patch
+	const int NUM_X = 31; //vertices on X axis
+	const int NUM_Z = 31; //vertices on Z axis
+
+	btSoftBody* body = btSoftBodyHelpers::CreatePatch(world->getWorldInfo(),
+		btVector3(-s / 2, s + 1, 0),
+		btVector3(+s / 2, s + 1, 0),
+		btVector3(-s / 2, s + 1, +s),
+		btVector3(+s / 2, s + 1, +s),
+		
+		NUM_X, NUM_Z,
+		fixed, true);
+	//body->getCollisionShape()->setMargin(0.001f);
+	body->generateBendingConstraints(2, body->appendMaterial());
+	body->setTotalMass(10);
+	//body->m_cfg.citerations = 10;
+	//body->m_cfg.diterations = 10;
+	body->m_cfg.piterations = 5;
+	body->m_cfg.kDP = 0.005f;
+
+	world->addSoftBody(body);
+
+	softBody = body;
+
+	return body;
+}
+
 btSoftBody* Cloth::CreateCloth(int fixed, int width, int height, btScalar _s)
 {
 	const btScalar s = 4; //size of cloth patch

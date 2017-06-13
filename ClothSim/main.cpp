@@ -111,6 +111,7 @@ btSoftBody::Node*					m_node;
 btVector3							m_goal;
 
 //set node position directly
+//control the node position yourself
 /*
 btVector3   delta=targetPosition - softDemo->m_node->m_x;
 softDemo->m_node->m_x = targetPosition;
@@ -167,7 +168,7 @@ btVector3 getRayTo(int x, int y)
 	glm::vec3 cameraLoc = camera->getLocation();
 	glm::vec3 cameraFront = camera->getLocation() + camera->getVector();
 	btVector3 cameraPosition = btVector3(cameraLoc.x, cameraLoc.y, cameraLoc.z);
-	btVector3 cameraTarget = btVector3(cameraFront.x, cameraFront.y, cameraFront.z);
+	btVector3 cameraTarget = btVector3(cameraFront.x + 0.3, cameraFront.y, cameraFront.z);
 
 	// get a ray pointing forward from the 
 	// camera and extend it to the far plane	
@@ -277,15 +278,15 @@ void initPhysics()
 	//Cloth* cloth2 = new Cloth(world);
 	//btSoftBody* clothBody2 = cloth2->CreateCloth(0);
 
-	btRigidBody* body = ball->CreateSphere(0.10, -2, 5, 0, 0.0);
-	//bodies.push_back(body);
+	btRigidBody* body = ball->CreateSphere(0.1, -2, 5, 0, 0.0);
+	bodies.push_back(body);
 
-	btRigidBody* body1 = ball->CreateSphere(0.10, -1, 5, 0, 1000.0);
+	btRigidBody* body1 = ball->CreateSphere(.1, -1, 5, 0, 1000.0);
 	bodies.push_back(body1);
 	body1->setGravity(btVector3(0, 0, 0));
-	body1->setLinearVelocity(btVector3(-1.0f, 0, 0));
+	//body1->setLinearVelocity(btVector3(-1.0f, 0, 0));
 
-	btRigidBody* body2 = ball->CreateSphere(0.10, 0, 5, 0, 1000.0);
+	btRigidBody* body2 = ball->CreateSphere(.1, 0, 5, 0, 1000.0);
 	bodies.push_back(body2);
 	body2->setGravity(btVector3(0, 0, 0));
 	body2->setLinearVelocity(btVector3(-1.0f, 0, 0));
@@ -300,21 +301,183 @@ void initPhysics()
 	body4->setGravity(btVector3(0, 0, 0));
 	body4->setLinearVelocity(btVector3(-1.0f, 0, 0));
 
-	//clothBody->appendAnchor(0, body);
+	clothBody->appendAnchor(1, body);
 	clothBody->appendAnchor(7, body1);
 	clothBody->appendAnchor(14, body2);
 	clothBody->appendAnchor(21, body3);
 	clothBody->appendAnchor(28, body4);
 
-	//btSliderConstraint(btRigidBody& rbA,
-	//	btRigidBody& rbB,
-	//	const btTransform& frameInA,
-	//	const btTransform& frameInB,
-	//	bool useLinearReferenceFrameA);
+	//{
+	//	btTransform frameInA, frameInB;
+	//	frameInA = btTransform::getIdentity();
+	//	frameInB = btTransform::getIdentity();
 
-	//ground = new CPlane(world);
-	//btRigidBody* groundBody = ground->CreatePlane();
-	//bodies.push_back(groundBody);
+	//	btRigidBody* pRbA1 = body;
+	//	pRbA1->setActivationState(DISABLE_DEACTIVATION);
+
+	//	// add dynamic rigid body B1
+	//	btRigidBody* pRbB1 = body1;
+	//	pRbB1->setActivationState(DISABLE_DEACTIVATION);
+
+	//	// create slider constraint between A1 and B1 and add it to world
+	//	btSliderConstraint* spSlider1 = new btSliderConstraint(*pRbA1, *pRbB1, frameInA, frameInB, true);
+	//	spSlider1->setLowerLinLimit(-2.0F);
+	//	spSlider1->setUpperLinLimit(5.0F);
+
+	//	spSlider1->setLowerAngLimit(-SIMD_PI / 3.0F);
+	//	spSlider1->setUpperAngLimit(SIMD_PI / 3.0F);
+
+	//	world->addConstraint(spSlider1, true);
+	//	spSlider1->setDbgDrawSize(btScalar(5.f));
+	//}
+
+	{
+		//mass = 1.f;
+		//btVector3 sliderWorldPos(0, 10, 0);
+		//btVector3 sliderAxis(1, 0, 0);
+		//btScalar angle = 0.f;//SIMD_RADS_PER_DEG * 10.f;
+		//btMatrix3x3 sliderOrientation(btQuaternion(sliderAxis, angle));
+		//trans.setIdentity();
+		//trans.setOrigin(sliderWorldPos);
+		////trans.setBasis(sliderOrientation);
+		//sliderTransform = trans;
+
+		btRigidBody* d6body0 = body1;
+		d6body0->setActivationState(DISABLE_DEACTIVATION);
+		btRigidBody* fixedBody1 = body;
+		//world->addRigidBody(fixedBody1);
+
+		btTransform frameInA, frameInB;
+		frameInA = btTransform::getIdentity();
+		frameInB = btTransform::getIdentity();
+		//frameInA.setOrigin(btVector3(0., 5., 0.));
+		//frameInB.setOrigin(btVector3(0., 5., 0.));
+
+		btTransform sliderTransform;
+		btVector3 lowerSliderLimit = btVector3(-10, 0, 0);
+		btVector3 hiSliderLimit = btVector3(10, 0, 0);
+
+		//		bool useLinearReferenceFrameA = false;//use fixed frame B for linear llimits
+		bool useLinearReferenceFrameA = true;//use fixed frame A for linear llimits
+		btGeneric6DofConstraint* spSlider6Dof = new btGeneric6DofConstraint(*fixedBody1, *d6body0, frameInA, frameInB, useLinearReferenceFrameA);
+		spSlider6Dof->setLinearLowerLimit(lowerSliderLimit);
+		spSlider6Dof->setLinearUpperLimit(hiSliderLimit);
+
+		//range should be small, otherwise singularities will 'explode' the constraint
+		//		spSlider6Dof->setAngularLowerLimit(btVector3(-1.5,0,0));
+		//		spSlider6Dof->setAngularUpperLimit(btVector3(1.5,0,0));
+		//		spSlider6Dof->setAngularLowerLimit(btVector3(0,0,0));
+		//		spSlider6Dof->setAngularUpperLimit(btVector3(0,0,0));
+		spSlider6Dof->setAngularLowerLimit(btVector3(-SIMD_PI, 0, 0));
+		spSlider6Dof->setAngularUpperLimit(btVector3(1.5, 0, 0));
+
+		spSlider6Dof->getTranslationalLimitMotor()->m_enableMotor[0] = true;
+		spSlider6Dof->getTranslationalLimitMotor()->m_targetVelocity[0] = -5.0f;
+		spSlider6Dof->getTranslationalLimitMotor()->m_maxMotorForce[0] = 0.1f;
+
+		world->addConstraint(spSlider6Dof);
+		spSlider6Dof->setDbgDrawSize(btScalar(5.f));
+
+	}
+
+	{
+		btRigidBody* d6body0 = body2;
+		d6body0->setActivationState(DISABLE_DEACTIVATION);
+		btRigidBody* fixedBody1 = body1;
+
+		btTransform frameInA, frameInB;
+		frameInA = btTransform::getIdentity();
+		frameInB = btTransform::getIdentity();
+		frameInA.setOrigin(btVector3(0., 5., 0.));
+		frameInB.setOrigin(btVector3(0., 5., 0.));
+
+		btTransform sliderTransform;
+		btVector3 lowerSliderLimit = btVector3(-10, 0, 0);
+		btVector3 hiSliderLimit = btVector3(10, 0, 0);
+
+		//		bool useLinearReferenceFrameA = false;//use fixed frame B for linear llimits
+		bool useLinearReferenceFrameA = true;//use fixed frame A for linear llimits
+		btGeneric6DofConstraint* spSlider6Dof = new btGeneric6DofConstraint(*fixedBody1, *d6body0, frameInA, frameInB, useLinearReferenceFrameA);
+		spSlider6Dof->setLinearLowerLimit(lowerSliderLimit);
+		spSlider6Dof->setLinearUpperLimit(hiSliderLimit);
+
+		spSlider6Dof->setAngularLowerLimit(btVector3(-SIMD_PI, 0, 0));
+		spSlider6Dof->setAngularUpperLimit(btVector3(1.5, 0, 0));
+
+		spSlider6Dof->getTranslationalLimitMotor()->m_enableMotor[0] = true;
+		spSlider6Dof->getTranslationalLimitMotor()->m_targetVelocity[0] = -5.0f;
+		spSlider6Dof->getTranslationalLimitMotor()->m_maxMotorForce[0] = 0.1f;
+
+		world->addConstraint(spSlider6Dof);
+		spSlider6Dof->setDbgDrawSize(btScalar(5.f));
+
+	}
+
+	{
+		btRigidBody* d6body0 = body3;
+		d6body0->setActivationState(DISABLE_DEACTIVATION);
+		btRigidBody* fixedBody1 = body2;
+
+		btTransform frameInA, frameInB;
+		frameInA = btTransform::getIdentity();
+		frameInB = btTransform::getIdentity();
+		frameInA.setOrigin(btVector3(0., 5., 0.));
+		frameInB.setOrigin(btVector3(0., 5., 0.));
+
+		btTransform sliderTransform;
+		btVector3 lowerSliderLimit = btVector3(-10, 0, 0);
+		btVector3 hiSliderLimit = btVector3(10, 0, 0);
+
+		//		bool useLinearReferenceFrameA = false;//use fixed frame B for linear llimits
+		bool useLinearReferenceFrameA = true;//use fixed frame A for linear llimits
+		btGeneric6DofConstraint* spSlider6Dof = new btGeneric6DofConstraint(*fixedBody1, *d6body0, frameInA, frameInB, useLinearReferenceFrameA);
+		spSlider6Dof->setLinearLowerLimit(lowerSliderLimit);
+		spSlider6Dof->setLinearUpperLimit(hiSliderLimit);
+
+		spSlider6Dof->setAngularLowerLimit(btVector3(-SIMD_PI, 0, 0));
+		spSlider6Dof->setAngularUpperLimit(btVector3(1.5, 0, 0));
+
+		spSlider6Dof->getTranslationalLimitMotor()->m_enableMotor[0] = true;
+		spSlider6Dof->getTranslationalLimitMotor()->m_targetVelocity[0] = -5.0f;
+		spSlider6Dof->getTranslationalLimitMotor()->m_maxMotorForce[0] = 0.1f;
+
+		world->addConstraint(spSlider6Dof);
+		spSlider6Dof->setDbgDrawSize(btScalar(5.f));
+
+	}
+
+	{
+		btRigidBody* d6body0 = body3;
+		d6body0->setActivationState(DISABLE_DEACTIVATION);
+		btRigidBody* fixedBody1 = body4;
+
+		btTransform frameInA, frameInB;
+		frameInA = btTransform::getIdentity();
+		frameInB = btTransform::getIdentity();
+		frameInA.setOrigin(btVector3(0., 5., 0.));
+		frameInB.setOrigin(btVector3(0., 5., 0.));
+
+		btTransform sliderTransform;
+		btVector3 lowerSliderLimit = btVector3(-10, 0, 0);
+		btVector3 hiSliderLimit = btVector3(10, 0, 0);
+
+		//		bool useLinearReferenceFrameA = false;//use fixed frame B for linear llimits
+		bool useLinearReferenceFrameA = true;//use fixed frame A for linear llimits
+		btGeneric6DofConstraint* spSlider6Dof = new btGeneric6DofConstraint(*fixedBody1, *d6body0, frameInA, frameInB, useLinearReferenceFrameA);
+		spSlider6Dof->setLinearLowerLimit(lowerSliderLimit);
+		spSlider6Dof->setLinearUpperLimit(hiSliderLimit);
+
+		spSlider6Dof->setAngularLowerLimit(btVector3(-SIMD_PI, 0, 0));
+		spSlider6Dof->setAngularUpperLimit(btVector3(1.5, 0, 0));
+
+		spSlider6Dof->getTranslationalLimitMotor()->m_enableMotor[0] = true;
+		spSlider6Dof->getTranslationalLimitMotor()->m_targetVelocity[0] = -5.0f;
+		spSlider6Dof->getTranslationalLimitMotor()->m_maxMotorForce[0] = 0.1f;
+
+		world->addConstraint(spSlider6Dof);
+		spSlider6Dof->setDbgDrawSize(btScalar(5.f));
+
+	}
 
 	cube = new CCube(world);
 	cubeBody = cube->CreateCube(1, 0.1, 0, -2, 3.9, 2, 0.0);
@@ -653,7 +816,8 @@ void FunctionKeyDown(int key, int x, int y)
 	//cloth falls down
 		world->removeSoftBody(cloth->softBody);
 		cloth = new Cloth(world);
-		btSoftBody* clothBody = cloth->CreateCloth(0, gWidth, gHeight, 1);
+		//* clothBody = cloth->CreateCloth(0, gWidth, gHeight, 1);
+		btSoftBody* clothBody = cloth->FallingCloth(0, gWidth, gHeight, 1);
 	}
 		break;
 	case GLUT_KEY_F2:
@@ -951,15 +1115,8 @@ void CreatePickingConstraint(int x, int y)
 	pivot.setIdentity();
 	pivot.setOrigin(localPivot);
 
-	//btSliderConstraint* sliderConstraint =  (btRigidBody& rbA,
-	//	btRigidBody& rbB,
-	//	const btTransform& frameInA,
-	//	const btTransform& frameInB,
-	//	bool useLinearReferenceFrameA);
-
 	// create our constraint object
-	btGeneric6DofConstraint* dof6 = new btGeneric6DofConstraint(*m_pPickedBody,
-		pivot, true);
+	btGeneric6DofConstraint* dof6 = new btGeneric6DofConstraint(*m_pPickedBody, pivot, true);
 	bool bLimitAngularMotion = true;
 	if (bLimitAngularMotion)
 	{
@@ -1298,7 +1455,7 @@ void mouseFunc(int button, int state, int x, int y)
 		case	GLUT_UP:
 			if ((!m_drag) && m_cutting && (m_results.fraction<1.f))
 			{
-				ImplicitSphere	isphere(m_impact, 1);
+				ImplicitSphere	isphere(m_impact, 0.1);
 				printf("Mass before: %f\r\n", m_results.body->getTotalMass());
 				m_results.body->refine(&isphere, 0.0001, true);
 				printf("Mass after: %f\r\n", m_results.body->getTotalMass());
